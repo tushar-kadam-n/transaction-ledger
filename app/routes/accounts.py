@@ -53,3 +53,15 @@ def get_account_balance(
         "account_id": account.id,
         "balance": account.balance,
     }
+
+
+
+@router.get("", response_model=list[AccountResponse])
+def list_accounts(
+    db: Session = Depends(get_db),
+):
+    accounts = db.scalars(
+        select(Account).order_by(Account.created_at.desc())
+    ).all()
+
+    return accounts
