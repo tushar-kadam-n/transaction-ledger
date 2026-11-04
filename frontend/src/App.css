@@ -1,6 +1,7 @@
 .app {
   min-height: 100vh;
   color: var(--ink);
+  overflow-x: clip;
 }
 
 .sidebar {
@@ -101,6 +102,7 @@ nav {
 .main {
   width: calc(100% - 250px);
   min-width: 0;
+  max-width: 100%;
   margin-left: 250px;
   padding: 0 clamp(24px, 3.2vw, 52px) 48px;
 }
@@ -641,6 +643,8 @@ h2 {
   width: 100%;
   min-width: 0;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
@@ -761,6 +765,10 @@ h2 {
     gap: 14px;
   }
 
+  .stat-card h3 {
+    overflow-wrap: anywhere;
+  }
+
   .stat-card {
     padding: 20px;
   }
@@ -807,7 +815,7 @@ h2 {
   }
 
   .stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .welcome {
@@ -830,6 +838,11 @@ h2 {
   .main>form button {
     justify-self: start;
   }
+
+  .overview-bottom .accounts-grid,
+  .accounts-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  }
 }
 
 @media (max-width: 600px) {
@@ -847,12 +860,13 @@ h2 {
   }
 
   .nav-item {
-    padding: 9px 2px;
-    font-size: 10px;
+    min-height: 40px;
+    padding: 9px 4px;
+    font-size: 11px;
   }
 
   .main {
-    padding: 0 15px 28px;
+    padding: 0 14px 28px;
   }
 
   .topbar {
@@ -871,7 +885,7 @@ h2 {
 
   .welcome {
     border-radius: 13px;
-    padding: 22px;
+    padding: 20px;
   }
 
   .welcome h2 {
@@ -906,7 +920,7 @@ h2 {
   .content-card {
     gap: 18px;
     border-radius: 12px;
-    padding: 19px;
+    padding: 18px;
   }
 
   .overview-section-header {
@@ -922,6 +936,10 @@ h2 {
     align-items: flex-start;
     gap: 12px;
     padding: 15px 0;
+  }
+
+  .recent-transaction-item .transaction-info {
+    overflow-wrap: anywhere;
   }
 
   .transaction-info h3 {
@@ -951,8 +969,24 @@ h2 {
     width: 100%;
   }
 
+  .main>form input,
+  .main>form button,
+  .transaction-form input,
+  .transaction-form select,
+  .history-filters select {
+    min-height: 44px;
+  }
+
   .accounts-grid {
     grid-template-columns: 1fr;
+  }
+
+  .accounts-grid .stat-card h3,
+  .overview-account-card h3,
+  .accounts-grid .stat-card span,
+  .overview-account-card span {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .transaction-form {
@@ -990,5 +1024,46 @@ h2 {
 
   .history-pagination .secondary-button {
     padding-inline: 10px;
+    min-height: 44px;
+  }
+
+  .history-pagination span {
+    text-align: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .sidebar {
+    padding-inline: 9px;
+  }
+
+  .brand {
+    gap: 8px;
+    padding-inline: 4px;
+    font-size: 13px;
+  }
+
+  nav {
+    gap: 2px;
+  }
+
+  .nav-item {
+    padding-inline: 1px;
+    font-size: 10px;
+  }
+
+  .main {
+    padding-inline: 10px;
+  }
+
+  .welcome,
+  .overview-bottom .content-card,
+  .content-card,
+  .main>form {
+    padding: 15px;
+  }
+
+  .profile {
+    gap: 0;
   }
 }
