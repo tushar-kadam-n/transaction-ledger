@@ -7,7 +7,11 @@ import pytest
 def create_account(client, name="Alice"):
     response = client.post(
         "/api/accounts",
-        json={"name": name},
+        json={
+            "name": name,
+            "account_type": "savings",
+            "email": f"{uuid.uuid4()}@example.com",
+        },
     )
     assert response.status_code == 201
     return response.json()["id"]
@@ -204,3 +208,61 @@ def test_missing_account_returns_404(client):
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize(
+    "contact_fields",
+    [
+        {"email": "only-email@example.com"},
+        {"phone": "+1 (555) 123-4567"},
+        {"email": "both@example.com", "phone": "5551234567"},
+    ],
+)
+def test_create_account_with_contact_details(client, contact_fields):
+    response = client.post(
+        "/api/accounts",
+        json={
+            "name": "  Contact account  ",
+            "account_type": "digital_wallet",
+            "description": "  Primary account  ",
+            **contact_fields,
+        },
+    )
+
+    assert response.status_code == 201
+    result = response.json()
+    assert result["name"] == "Contact account"
+    assert result["account_type"] == "digital_wallet"
+    assert float(result["balance"]) == 0.0
+    assert result["email"] == contact_fields.get("email")
+    assert result["phone"] == contact_fields.get("phone")
+    assert result["description"] == "Primary account"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"name": "No contact", "account_type": "savings"},
+        {
+            "name": "Bad email",
+            "account_type": "savings",
+            "email": "not-an-email",
+        },
+        {
+            "name": "Bad phone",
+            "account_type": "savings",
+            "phone": "12-abc",
+        },
+        {
+            "name": "No type",
+            "email": "valid@example.com",
+        },
+        {
+            "account_type": "savings",
+            "email": "valid@example.com",
+        },
+    ],
+)
+def test_create_account_validation(client, payload):
+    response = client.post("/api/accounts", json=payload)
+    assert response.status_code == 422

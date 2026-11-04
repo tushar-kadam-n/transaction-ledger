@@ -18,7 +18,13 @@ def create_account(
     payload: AccountCreate,
     db: Session = Depends(get_db),
 ):
-    account = Account(name=payload.name.strip())
+    account = Account(
+        name=payload.name,
+        account_type=payload.account_type,
+        email=payload.email,
+        phone=payload.phone,
+        description=payload.description,
+    )
 
     db.add(account)
     db.commit()

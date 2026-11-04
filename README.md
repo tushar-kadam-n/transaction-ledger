@@ -75,6 +75,12 @@ DATABASE_URL=postgresql+psycopg://YOUR_USERNAME:YOUR_PASSWORD@localhost:5432/tra
 
 Replace the placeholders with your local PostgreSQL credentials. Do not commit your `.env` file or real credentials to GitHub.
 
+Apply pending database migrations before starting the application:
+
+```bash
+alembic upgrade head
+```
+
 ### 5. Start the application
 
 From the project root, run:

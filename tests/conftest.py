@@ -40,7 +40,6 @@ TestingSessionLocal = sessionmaker(
 def setup_test_database():
     Base.metadata.create_all(bind=test_engine)
     yield
-    Base.metadata.drop_all(bind=test_engine)
     test_engine.dispose()
 
 

@@ -16,13 +16,17 @@ Request body:
 
 ```json
 {
-  "name": "Test Account"
+  "name": "Test Account",
+  "account_type": "savings",
+  "email": "test@example.com",
+  "phone": null,
+  "description": null
 }
 ```
 
-Successful response: `201 Created` (if configured by the application).
+`account_type` must be one of `savings`, `current`, `cash`, `digital_wallet`, or `business`. Provide at least one of `email` or `phone`; both and `description` are optional. Account names and text fields are trimmed, and the initial balance is always zero.
 
-The response contains the account ID, name, balance, and creation timestamp.
+The response contains account details, balance, and creation timestamp.
 
 Validation errors return `422 Unprocessable Entity`.
 
