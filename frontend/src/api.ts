@@ -95,6 +95,10 @@ export async function getTransactions(
 
 export type CreateAccountPayload = {
   name: string;
+  account_type: "savings" | "current" | "cash" | "digital_wallet" | "business";
+  email?: string;
+  phone?: string;
+  description?: string;
 };
 
 export async function createAccount(payload: CreateAccountPayload) {

@@ -11,8 +11,29 @@ import "./App.css";
 type Account = {
   id: string;
   name: string;
+  account_type: "savings" | "current" | "cash" | "digital_wallet" | "business";
+  email: string | null;
+  phone: string | null;
+  description: string | null;
   balance: number | string;
 };
+
+type NewAccount = {
+  name: string;
+  account_type: NewAccountType | "";
+  email: string;
+  phone: string;
+  description: string;
+};
+
+type NewAccountType =
+  | "savings"
+  | "current"
+  | "cash"
+  | "digital_wallet"
+  | "business";
+
+type AccountFormErrors = Partial<Record<keyof NewAccount, string>>;
 
 type Tab = "Overview" | "Accounts" | "Transactions" | "History";
 
@@ -41,7 +62,15 @@ function App() {
 
   const [historyPage, setHistoryPage] = useState(1);
   const [historyLimit] = useState(10);
-  const [newAccountName, setNewAccountName] = useState("");
+  const [newAccount, setNewAccount] = useState<NewAccount>({
+    name: "",
+    account_type: "",
+    email: "",
+    phone: "",
+    description: "",
+  });
+  const [accountFormErrors, setAccountFormErrors] =
+    useState<AccountFormErrors>({});
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [accountCreateMessage, setAccountCreateMessage] = useState("");
   const [accountCreateError, setAccountCreateError] = useState("");
@@ -205,17 +234,43 @@ function App() {
     setAccountCreateMessage("");
     setAccountCreateError("");
 
-    const name = newAccountName.trim();
+    const name = newAccount.name.trim();
+    const accountType = newAccount.account_type;
+    const email = newAccount.email.trim();
+    const phone = newAccount.phone.trim();
+    const description = newAccount.description.trim();
+    const errors: AccountFormErrors = {};
 
-    if (!name) {
-      setAccountCreateError("Please enter an account name.");
-      return;
+    if (!name) errors.name = "Enter an account name.";
+    if (!accountType) errors.account_type = "Select an account type.";
+
+    if (!email && !phone) {
+      errors.email = "Provide an email address or phone number.";
+      errors.phone = "Provide an email address or phone number.";
+    } else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      errors.email = "Enter a valid email address.";
     }
+
+    if (phone) {
+      const digitCount = phone.replace(/\D/g, "").length;
+      if (!/^\+?[0-9][0-9\s().-]*$/.test(phone) || digitCount < 7 || digitCount > 15) {
+        errors.phone = "Enter a valid phone number.";
+      }
+    }
+
+    setAccountFormErrors(errors);
+    if (Object.keys(errors).length > 0 || !accountType) return;
 
     setCreatingAccount(true);
 
     try {
-      const result = await createAccount({ name });
+      const result = await createAccount({
+        name,
+        account_type: accountType,
+        email: email || undefined,
+        phone: phone || undefined,
+        description: description || undefined,
+      });
 
       const updatedAccounts = await getAccounts();
       setAccounts(updatedAccounts);
@@ -223,7 +278,14 @@ function App() {
       setSelectedAccountId(result.id);
 
       setAccountCreateMessage("Account created successfully!");
-      setNewAccountName("");
+      setNewAccount({
+        name: "",
+        account_type: "",
+        email: "",
+        phone: "",
+        description: "",
+      });
+      setAccountFormErrors({});
     } catch (error) {
       setAccountCreateError(
         error instanceof Error ? error.message : "Unable to create account.",
@@ -354,7 +416,9 @@ function App() {
                       <span>
                         Balance: ₹{Number(account.balance).toFixed(2)}
                       </span>
-                      <p className="muted account-id">ID: {account.id}</p>
+                      <p className="muted account-id">
+                        {account.account_type.replace("_", " ")} account
+                      </p>
                     </article>
                   ))}
                 </div>
@@ -422,23 +486,141 @@ function App() {
 
         {activeTab === "Accounts" && (
           <>
-            <form onSubmit={handleCreateAccount}>
+            <form
+              className="account-create-form"
+              onSubmit={handleCreateAccount}
+              noValidate
+            >
               <h3>Create New Account</h3>
 
-              <input
-                type="text"
-                placeholder="Enter account name"
-                value={newAccountName}
-                onChange={(e) => setNewAccountName(e.target.value)}
-              />
+              <div className="account-form-field">
+                <label htmlFor="new-account-name">Account Name</label>
+                <input
+                  id="new-account-name"
+                  type="text"
+                  required
+                  maxLength={150}
+                  placeholder="Enter account name"
+                  value={newAccount.name}
+                  aria-invalid={Boolean(accountFormErrors.name)}
+                  aria-describedby={accountFormErrors.name ? "account-name-error" : undefined}
+                  onChange={(e) => {
+                    setNewAccount({ ...newAccount, name: e.target.value });
+                    setAccountFormErrors({});
+                  }}
+                />
+                {accountFormErrors.name && (
+                  <span className="field-error" id="account-name-error" role="alert">
+                    {accountFormErrors.name}
+                  </span>
+                )}
+              </div>
+
+              <div className="account-form-field">
+                <label htmlFor="new-account-type">Account Type</label>
+                <select
+                  id="new-account-type"
+                  required
+                  value={newAccount.account_type}
+                  aria-invalid={Boolean(accountFormErrors.account_type)}
+                  aria-describedby={accountFormErrors.account_type ? "account-type-error" : undefined}
+                  onChange={(e) => {
+                    setNewAccount({
+                      ...newAccount,
+                      account_type: e.target.value as NewAccountType | "",
+                    });
+                    setAccountFormErrors({});
+                  }}
+                >
+                  <option value="">Select account type</option>
+                  <option value="savings">Savings</option>
+                  <option value="current">Current</option>
+                  <option value="cash">Cash</option>
+                  <option value="digital_wallet">Digital Wallet</option>
+                  <option value="business">Business</option>
+                </select>
+                {accountFormErrors.account_type && (
+                  <span className="field-error" id="account-type-error" role="alert">
+                    {accountFormErrors.account_type}
+                  </span>
+                )}
+              </div>
+
+              <div className="account-form-field">
+                <label htmlFor="new-account-email">Email Address (optional)</label>
+                <input
+                  id="new-account-email"
+                  type="email"
+                  maxLength={254}
+                  placeholder="name@example.com"
+                  value={newAccount.email}
+                  aria-invalid={Boolean(accountFormErrors.email)}
+                  aria-describedby={accountFormErrors.email ? "account-email-error" : undefined}
+                  onChange={(e) => {
+                    setNewAccount({ ...newAccount, email: e.target.value });
+                    setAccountFormErrors({});
+                  }}
+                />
+                {accountFormErrors.email && (
+                  <span className="field-error" id="account-email-error" role="alert">
+                    {accountFormErrors.email}
+                  </span>
+                )}
+              </div>
+
+              <div className="account-form-field">
+                <label htmlFor="new-account-phone">Phone Number (optional)</label>
+                <input
+                  id="new-account-phone"
+                  type="tel"
+                  maxLength={32}
+                  placeholder="+1 555 123 4567"
+                  value={newAccount.phone}
+                  aria-invalid={Boolean(accountFormErrors.phone)}
+                  aria-describedby={accountFormErrors.phone ? "account-phone-error" : undefined}
+                  onChange={(e) => {
+                    setNewAccount({ ...newAccount, phone: e.target.value });
+                    setAccountFormErrors({});
+                  }}
+                />
+                {accountFormErrors.phone && (
+                  <span className="field-error" id="account-phone-error" role="alert">
+                    {accountFormErrors.phone}
+                  </span>
+                )}
+              </div>
+
+              <div className="account-form-field account-form-field-wide">
+                <label htmlFor="new-account-description">Description (optional)</label>
+                <textarea
+                  id="new-account-description"
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="Add a note about this account"
+                  value={newAccount.description}
+                  onChange={(e) => {
+                    setNewAccount({ ...newAccount, description: e.target.value });
+                    setAccountFormErrors({});
+                  }}
+                />
+              </div>
+
+              <div className="account-initial-balance" aria-label="Initial balance is zero rupees">
+                <span>Initial Balance</span>
+                <strong>₹0.00</strong>
+              </div>
 
               <button type="submit" disabled={creatingAccount}>
                 {creatingAccount ? "Creating..." : "Create Account"}
               </button>
 
-              {accountCreateMessage && <p>{accountCreateMessage}</p>}
+              {accountCreateMessage && (
+                <p className="success-message">{accountCreateMessage}</p>
+              )}
 
-              {accountCreateError && <p>{accountCreateError}</p>}
+              {accountCreateError && (
+                <p className="error-message">{accountCreateError}</p>
+              )}
             </form>
             <section className="content-card accounts-content">
               <div>
@@ -461,7 +643,9 @@ function App() {
                     <p>Account name</p>
                     <h3>{account.name}</h3>
                     <span>Balance: ₹{Number(account.balance).toFixed(2)}</span>
-                    <p className="muted">ID: {account.id}</p>
+                    <p className="muted">
+                      {account.account_type.replace("_", " ")} account
+                    </p>
                   </article>
                 ))}
               </div>
