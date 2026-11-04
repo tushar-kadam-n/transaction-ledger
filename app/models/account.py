@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Numeric, String, func
+from sqlalchemy import DateTime, Numeric, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,6 +23,19 @@ class Account(Base):
         String(150),
         nullable=False,
     )
+
+    account_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="savings",
+        server_default="savings",
+    )
+
+    email: Mapped[str | None] = mapped_column(String(254), nullable=True)
+
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     balance: Mapped[Decimal] = mapped_column(
         Numeric(18, 2),

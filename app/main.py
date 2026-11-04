@@ -6,6 +6,7 @@ from app.database import Base, engine
 from app.models.account import Account
 from app.models.transaction import Transaction
 from app.routes.accounts import router as accounts_router
+from app.routes.transactions import global_router as global_transactions_router
 from app.routes.transactions import router as transactions_router
 
 app = FastAPI(
@@ -19,6 +20,7 @@ Base.metadata.create_all(bind=engine)
 
 app.include_router(accounts_router)
 app.include_router(transactions_router)
+app.include_router(global_transactions_router)
 
 @app.get("/health")
 def health_check():
