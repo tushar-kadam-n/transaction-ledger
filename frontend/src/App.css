@@ -666,10 +666,69 @@ h2 {
 /* Transactions */
 .transaction-form {
   display: grid;
-  width: min(100%, 760px);
+  width: min(100%);
   grid-template-columns: minmax(130px, 0.55fr) minmax(0, 1.45fr);
   align-items: center;
   gap: 14px 18px;
+}
+
+.transaction-balance-panels {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  margin-top: -2px;
+}
+
+.balance-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #f8fafb;
+}
+
+.balance-panel span {
+  color: #536477;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.balance-panel strong {
+  color: var(--ink);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.projected-balance-panel.credit {
+  border-color: #c6e2d4;
+  background: #f3faf6;
+}
+
+.projected-balance-panel.credit strong {
+  color: var(--green);
+}
+
+.projected-balance-panel.debit {
+  border-color: #ecd3d6;
+  background: #fff8f8;
+}
+
+.projected-balance-panel.debit strong {
+  color: var(--red);
+}
+
+.transaction-form .amount-validation-message {
+  grid-column: 1 / -1;
+  margin: -7px 0 0;
+  color: var(--red);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .transaction-form label,
@@ -760,7 +819,7 @@ h2 {
 
 .history-table {
   width: 100%;
-  min-width: 880px;
+  min-width: 1180px;
   table-layout: fixed;
   border-collapse: collapse;
   text-align: left;
@@ -791,54 +850,60 @@ h2 {
   background: #f8fbf9;
 }
 
-.history-table tbody tr:has(.transaction-badge.credit) td:nth-child(3) {
+.history-table tbody tr:has(.transaction-badge.credit) td:nth-child(4) {
   color: var(--green);
   font-weight: 700;
 }
 
-.history-table tbody tr:has(.transaction-badge.debit) td:nth-child(3) {
+.history-table tbody tr:has(.transaction-badge.debit) td:nth-child(4) {
   color: var(--red);
   font-weight: 700;
 }
 
 .history-table th:nth-child(1),
 .history-table td:nth-child(1) {
-  width: 105px;
+  width: 72px;
   color: #596a7e;
   font-variant-numeric: tabular-nums;
 }
 
 .history-table th:nth-child(2),
 .history-table td:nth-child(2) {
-  width: 90px;
+  width: 160px;
+  overflow-wrap: anywhere;
 }
 
 .history-table th:nth-child(3),
 .history-table td:nth-child(3) {
+  width: 90px;
+}
+
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) {
   width: 115px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.history-table th:nth-child(4),
-.history-table td:nth-child(4) {
+.history-table th:nth-child(5),
+.history-table td:nth-child(5) {
   width: 25%;
 }
 
-.history-table td:nth-child(4),
-.history-table td:nth-child(5) {
+.history-table td:nth-child(5),
+.history-table td:nth-child(6) {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.history-table th:nth-child(5),
-.history-table td:nth-child(5) {
+.history-table th:nth-child(6),
+.history-table td:nth-child(6) {
   width: 20%;
 }
 
-.history-table th:nth-child(6),
-.history-table td:nth-child(6) {
+.history-table th:nth-child(7),
+.history-table td:nth-child(7) {
   width: 190px;
   color: #536477;
   white-space: nowrap;
@@ -1109,6 +1174,11 @@ h2 {
   .transaction-form {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
+  }
+
+  .transaction-balance-panels {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
   }
 
   .transaction-form label:not(:first-child) {

@@ -78,6 +78,37 @@ def test_insufficient_balance(client):
     )
     assert float(balance.json()["balance"]) == 0.0
 
+    history = client.get(f"/api/accounts/{account_id}/transactions")
+    assert history.status_code == 200
+    assert history.json()["total_records"] == 0
+
+
+def test_debit_equal_to_current_balance_is_allowed(client):
+    account_id = create_account(client)
+    credit = client.post(
+        f"/api/accounts/{account_id}/transactions",
+        json={
+            "type": "credit",
+            "amount": "25.00",
+            "description": "Deposit",
+            "reference_id": f"EQUAL-CREDIT-{uuid.uuid4()}",
+        },
+    )
+    assert credit.status_code == 201
+
+    debit = client.post(
+        f"/api/accounts/{account_id}/transactions",
+        json={
+            "type": "debit",
+            "amount": "25.00",
+            "description": "Full withdrawal",
+            "reference_id": f"EQUAL-DEBIT-{uuid.uuid4()}",
+        },
+    )
+
+    assert debit.status_code == 201
+    assert float(debit.json()["balance"]) == 0.0
+
 
 def test_duplicate_reference_does_not_change_balance(client):
     account_id = create_account(client)
@@ -154,6 +185,70 @@ def test_transaction_history_filter(client):
         tx["type"] == "debit"
         for tx in debit_response.json()["transactions"]
     )
+
+
+def test_unified_transaction_history_filters_and_paginates(client):
+    account_a = create_account(client, "History Account A")
+    account_b = create_account(client, "History Account B")
+
+    transaction_specs = [
+        (account_a, "credit", "10.00", "A initial credit"),
+        (account_a, "debit", "2.00", "A debit"),
+        (account_a, "credit", "3.00", "A newest credit"),
+        (account_b, "credit", "5.00", "B credit"),
+    ]
+    for account_id, transaction_type, amount, description in transaction_specs:
+        response = client.post(
+            f"/api/accounts/{account_id}/transactions",
+            json={
+                "type": transaction_type,
+                "amount": amount,
+                "description": description,
+                "reference_id": f"UNIFIED-{uuid.uuid4()}",
+            },
+        )
+        assert response.status_code == 201
+
+    all_history = client.get("/api/transactions?limit=100").json()
+    global_rows = {
+        row["description"]: row for row in all_history["transactions"]
+    }
+    assert {
+        "A initial credit",
+        "A debit",
+        "A newest credit",
+        "B credit",
+    } <= global_rows.keys()
+    assert global_rows["A debit"]["account_name"] == "History Account A"
+    assert global_rows["B credit"]["account_name"] == "History Account B"
+    assert "account_id" in global_rows["B credit"]
+
+    account_page_one = client.get(
+        f"/api/transactions?account_id={account_a}&page=1&limit=2"
+    ).json()
+    account_page_two = client.get(
+        f"/api/transactions?account_id={account_a}&page=2&limit=2"
+    ).json()
+    assert account_page_one["total_records"] == 3
+    assert account_page_one["total_pages"] == 2
+    assert len(account_page_one["transactions"]) == 2
+    assert len(account_page_two["transactions"]) == 1
+    assert account_page_one["transactions"][0]["description"] == "A newest credit"
+
+    debit_history = client.get(
+        f"/api/transactions?account_id={account_a}&type=debit"
+    ).json()
+    assert debit_history["total_records"] == 1
+    assert debit_history["transactions"][0]["description"] == "A debit"
+
+    credit_history = client.get("/api/transactions?type=credit&limit=100").json()
+    assert all(row["type"] == "credit" for row in credit_history["transactions"])
+
+    legacy_response = client.get(
+        f"/api/accounts/{account_a}/transactions"
+    ).json()
+    assert legacy_response["account_id"] == account_a
+    assert len(legacy_response["transactions"]) == 3
 
 
 def test_account_creation_rejects_client_balance(client):

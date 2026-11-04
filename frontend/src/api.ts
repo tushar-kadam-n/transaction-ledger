@@ -49,9 +49,11 @@ export type Transaction = {
   type: "credit" | "debit";
   amount: string;
   description: string;
-  reference_id: string;
+  reference_id: string | null;
   created_at: string;
 };
+
+export type TransactionHistoryItem = Transaction & { account_name: string };
 
 export type TransactionHistoryResponse = {
   account_id: string;
@@ -62,25 +64,45 @@ export type TransactionHistoryResponse = {
   transactions: Transaction[];
 };
 
+export type GlobalTransactionHistoryResponse = {
+  page: number;
+  limit: number;
+  total_records: number;
+  total_pages: number;
+  transactions: TransactionHistoryItem[];
+};
+
 export async function getTransactions(
   accountId: string,
   page = 1,
   limit = 10,
   type?: "credit" | "debit",
 ): Promise<TransactionHistoryResponse> {
+  const history = await getAllTransactions(page, limit, accountId, type);
+
+  return {
+    account_id: accountId,
+    ...history,
+  };
+}
+
+export async function getAllTransactions(
+  page = 1,
+  limit = 10,
+  accountId?: string,
+  type?: "credit" | "debit",
+): Promise<GlobalTransactionHistoryResponse> {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
 
-  if (type) {
-    params.append("type", type);
-  }
+  if (accountId) params.append("account_id", accountId);
+  if (type) params.append("type", type);
 
-  const response = await fetch(
-    `${API_BASE_URL}/accounts/${accountId}/transactions?${params}`,
-    { cache: "no-store" },
-  );
+  const response = await fetch(`${API_BASE_URL}/transactions?${params}`, {
+    cache: "no-store",
+  });
 
   const data = await response.json();
 

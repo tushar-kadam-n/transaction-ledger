@@ -26,3 +26,7 @@ class TransactionResponse(BaseModel):
     description: str
     reference_id: str
     created_at: datetime
+
+
+class TransactionHistoryItemResponse(TransactionResponse):
+    account_name: str
