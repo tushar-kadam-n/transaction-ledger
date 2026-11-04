@@ -137,7 +137,7 @@ def test_transaction_history_filter(client):
     )
 
     assert all_response.status_code == 200
-    assert all_response.json()["count"] == 2
+    assert all_response.json()["total_records"] == 2
 
     assert credit_response.status_code == 200
     assert all(
