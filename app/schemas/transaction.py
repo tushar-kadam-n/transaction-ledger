@@ -14,6 +14,7 @@ class TransactionCreate(BaseModel):
     amount: Decimal = Field(gt=0, max_digits=18, decimal_places=2)
     description: str = Field(min_length=1, max_length=2000)
     reference_id: str = Field(min_length=1, max_length=255)
+    transaction_date: datetime
 
 
 class TransactionResponse(BaseModel):
@@ -25,6 +26,7 @@ class TransactionResponse(BaseModel):
     amount: Decimal
     description: str
     reference_id: str
+    transaction_date: datetime
     created_at: datetime
 
 

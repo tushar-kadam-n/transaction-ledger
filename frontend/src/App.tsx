@@ -1,13 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getAccounts,
   createAccount,
   createTransaction,
   getAllTransactions,
-  getTransactions,
 } from "./api";
-import type { GlobalTransactionHistoryResponse, Transaction } from "./api";
+import type {
+  GlobalTransactionHistoryResponse,
+  TransactionHistoryItem,
+} from "./api";
 import "./App.css";
+
+function currentLocalDateTime() {
+  const now = new Date();
+  const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return localNow.toISOString().slice(0, 16);
+}
 
 type Account = {
   id: string;
@@ -51,6 +59,7 @@ function App() {
   const [amountTouched, setAmountTouched] = useState(false);
   const [description, setDescription] = useState("");
   const [referenceId, setReferenceId] = useState("");
+  const [transactionDate, setTransactionDate] = useState(currentLocalDateTime);
   const [submitting, setSubmitting] = useState(false);
   const [transactionMessage, setTransactionMessage] = useState("");
   const [transactionError, setTransactionError] = useState("");
@@ -64,7 +73,7 @@ function App() {
   const [historyAccountId, setHistoryAccountId] = useState("");
 
   const [historyPage, setHistoryPage] = useState(1);
-  const [historyLimit] = useState(10);
+  const [historyLimit] = useState(5);
   const [newAccount, setNewAccount] = useState<NewAccount>({
     name: "",
     account_type: "",
@@ -79,9 +88,10 @@ function App() {
   const [accountCreateMessage, setAccountCreateMessage] = useState("");
   const [accountCreateError, setAccountCreateError] = useState("");
   const [totalTransactions, setTotalTransactions] = useState(0);
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
-    [],
-  );
+  const [recentTransactions, setRecentTransactions] = useState<
+    TransactionHistoryItem[]
+  >([]);
+  const lastOverviewRequestTab = useRef<Tab | null>(null);
   const totalAccounts = accounts.length;
 
   const totalBalance = accounts.reduce(
@@ -156,35 +166,26 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "Overview" || accounts.length === 0) return;
+    if (activeTab !== "Overview") {
+      lastOverviewRequestTab.current = activeTab;
+      return;
+    }
+
+    if (lastOverviewRequestTab.current === "Overview") return;
+    lastOverviewRequestTab.current = "Overview";
 
     async function loadOverviewTransactions() {
       try {
-        const results = await Promise.all(
-          accounts.map((account) => getTransactions(account.id, 1, 5)),
-        );
-
-        const allTransactions = results.flatMap(
-          (result) => result.transactions,
-        );
-
-        const sortedTransactions = allTransactions?.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-        );
-
-        setRecentTransactions(sortedTransactions.slice(0, 5));
-
-        setTotalTransactions(
-          results.reduce((total, result) => total + result.total_records, 0),
-        );
+        const result = await getAllTransactions(1, 5);
+        setRecentTransactions(result.transactions);
+        setTotalTransactions(result.total_records);
       } catch (error) {
         console.error("Failed to load overview transactions:", error);
       }
     }
 
     loadOverviewTransactions();
-  }, [activeTab, accounts]);
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab !== "History") return;
@@ -205,7 +206,7 @@ function App() {
       } catch (error) {
         setHistoryError(
           error instanceof Error
-            ? error.message
+            ? error?.message
             : "Unable to load transaction history.",
         );
       } finally {
@@ -258,6 +259,7 @@ function App() {
         amount,
         description: description.trim(),
         reference_id: referenceId.trim(),
+        transaction_date: new Date(transactionDate).toISOString(),
       });
 
       if (result.duplicate) {
@@ -276,6 +278,7 @@ function App() {
       setAmountTouched(false);
       setDescription("");
       setReferenceId("");
+      setTransactionDate(currentLocalDateTime());
 
       console.log("Transaction response:", result);
     } catch (error) {
@@ -516,12 +519,7 @@ function App() {
                       >
                         <div className="transaction-info">
                           <h3>{transaction.description}</h3>
-                          <p>
-                            {accounts.find(
-                              (account) =>
-                                account.id === transaction.account_id,
-                            )?.name || "Unknown Account"}
-                          </p>
+                          <p>{transaction.account_name}</p>
                           <span>
                             {new Date(transaction.created_at).toLocaleString(
                               "en-IN",
@@ -848,6 +846,16 @@ function App() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Enter transaction description"
               />
+              <label htmlFor="transaction-date">
+                Transaction Date &amp; Time
+              </label>
+              <input
+                id="transaction-date"
+                type="datetime-local"
+                required
+                value={transactionDate}
+                onChange={(e) => setTransactionDate(e.target.value)}
+              />
               <label>Reference ID</label>
               <input
                 type="text"
@@ -976,7 +984,7 @@ function App() {
 
                               <td>
                                 {new Date(
-                                  transaction.created_at,
+                                  transaction.transaction_date,
                                 ).toLocaleString("en-IN")}
                               </td>
                             </tr>

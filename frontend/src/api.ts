@@ -17,6 +17,7 @@ export type TransactionPayload = {
   amount: string;
   description: string;
   reference_id: string;
+  transaction_date: string;
 };
 
 export async function createTransaction(
@@ -50,6 +51,7 @@ export type Transaction = {
   amount: string;
   description: string;
   reference_id: string | null;
+  transaction_date: string;
   created_at: string;
 };
 
@@ -104,15 +106,27 @@ export async function getAllTransactions(
     cache: "no-store",
   });
 
-  const data = await response.json();
+  const responseBody = await response.text();
+  let data: { detail?: string } | undefined;
+  try {
+    data = JSON.parse(responseBody) as { detail?: string };
+  } catch {
+    // Proxies and server errors can return plain text instead of JSON.
+  }
 
   if (!response.ok) {
     throw new Error(
-      data.detail || `Failed to fetch transactions: ${response.status}`,
+      data?.detail ||
+        responseBody ||
+        `Failed to fetch transactions: ${response.status}`,
     );
   }
 
-  return data;
+  if (!data) {
+    throw new Error("The server returned an invalid transaction history response.");
+  }
+
+  return data as GlobalTransactionHistoryResponse;
 }
 
 export type CreateAccountPayload = {

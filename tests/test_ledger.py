@@ -1,5 +1,6 @@
 
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 
@@ -15,6 +16,10 @@ def create_account(client, name="Alice"):
     )
     assert response.status_code == 201
     return response.json()["id"]
+
+
+def transaction_date():
+    return datetime.now(timezone.utc).isoformat()
 
 
 def test_create_account(client):
@@ -38,6 +43,7 @@ def test_credit_and_debit(client):
             "amount": "100.00",
             "description": "Deposit",
             "reference_id": f"CREDIT-{uuid.uuid4()}",
+            "transaction_date": transaction_date(),
         },
     )
 
@@ -51,11 +57,59 @@ def test_credit_and_debit(client):
             "amount": "30.00",
             "description": "Withdrawal",
             "reference_id": f"DEBIT-{uuid.uuid4()}",
+            "transaction_date": transaction_date(),
         },
     )
 
     assert debit.status_code == 201
     assert float(debit.json()["balance"]) == 70.0
+
+
+def test_transaction_dates_are_stored_and_returned_in_history(client):
+    account_id = create_account(client)
+    current_date = transaction_date()
+    past_date = "2020-01-02T03:04:05+00:00"
+
+    current = client.post(
+        f"/api/accounts/{account_id}/transactions",
+        json={
+            "type": "credit",
+            "amount": "40.00",
+            "description": "Current transaction",
+            "reference_id": f"DATE-CURRENT-{uuid.uuid4()}",
+            "transaction_date": current_date,
+        },
+    )
+    past = client.post(
+        f"/api/accounts/{account_id}/transactions",
+        json={
+            "type": "credit",
+            "amount": "5.00",
+            "description": "Past transaction",
+            "reference_id": f"DATE-PAST-{uuid.uuid4()}",
+            "transaction_date": past_date,
+        },
+    )
+
+    assert current.status_code == past.status_code == 201
+    assert datetime.fromisoformat(
+        current.json()["transaction"]["transaction_date"]
+    ) == datetime.fromisoformat(current_date)
+    assert datetime.fromisoformat(
+        past.json()["transaction"]["transaction_date"]
+    ) == datetime.fromisoformat(past_date)
+    assert float(past.json()["balance"]) == 45.0
+
+    history = client.get(f"/api/transactions?account_id={account_id}").json()
+    history_by_description = {
+        row["description"]: row for row in history["transactions"]
+    }
+    assert datetime.fromisoformat(
+        history_by_description["Past transaction"]["transaction_date"]
+    ) == datetime.fromisoformat(past_date)
+    assert float(
+        client.get(f"/api/accounts/{account_id}/balance").json()["balance"]
+    ) == 45.0
 
 
 def test_insufficient_balance(client):
@@ -68,6 +122,7 @@ def test_insufficient_balance(client):
             "amount": "50.00",
             "description": "Withdrawal",
             "reference_id": f"DEBIT-{uuid.uuid4()}",
+            "transaction_date": transaction_date(),
         },
     )
 
@@ -92,6 +147,7 @@ def test_debit_equal_to_current_balance_is_allowed(client):
             "amount": "25.00",
             "description": "Deposit",
             "reference_id": f"EQUAL-CREDIT-{uuid.uuid4()}",
+            "transaction_date": transaction_date(),
         },
     )
     assert credit.status_code == 201
@@ -103,6 +159,7 @@ def test_debit_equal_to_current_balance_is_allowed(client):
             "amount": "25.00",
             "description": "Full withdrawal",
             "reference_id": f"EQUAL-DEBIT-{uuid.uuid4()}",
+            "transaction_date": transaction_date(),
         },
     )
 
@@ -118,6 +175,7 @@ def test_duplicate_reference_does_not_change_balance(client):
         "amount": "100.00",
         "description": "Deposit",
         "reference_id": f"DUPLICATE-{uuid.uuid4()}",
+        "transaction_date": transaction_date(),
     }
 
     first = client.post(
@@ -148,6 +206,7 @@ def test_transaction_history_filter(client):
             "amount": "20.00",
             "description": "Deposit",
             "reference_id": f"HISTORY-CREDIT-{uuid.uuid4()}",
+            "transaction_date": transaction_date(),
         },
     )
 
@@ -158,6 +217,7 @@ def test_transaction_history_filter(client):
             "amount": "10.00",
             "description": "Withdrawal",
             "reference_id": f"HISTORY-DEBIT-{uuid.uuid4()}",
+            "transaction_date": transaction_date(),
         },
     )
 
@@ -205,6 +265,7 @@ def test_unified_transaction_history_filters_and_paginates(client):
                 "amount": amount,
                 "description": description,
                 "reference_id": f"UNIFIED-{uuid.uuid4()}",
+                "transaction_date": transaction_date(),
             },
         )
         assert response.status_code == 201
@@ -269,6 +330,7 @@ def test_duplicate_reference_on_different_accounts(client):
         "amount": "100.00",
         "description": "Deposit",
         "reference_id": f"SHARED-{uuid.uuid4()}",
+        "transaction_date": transaction_date(),
     }
 
     first = client.post(
