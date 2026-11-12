@@ -94,6 +94,8 @@ export async function getAllTransactions(
   accountId?: string,
   type?: "credit" | "debit",
   search?: string,
+  startDate?: string,
+  endDate?: string,
 ): Promise<GlobalTransactionHistoryResponse> {
   const params = new URLSearchParams({
     page: String(page),
@@ -103,6 +105,8 @@ export async function getAllTransactions(
   if (accountId) params.append("account_id", accountId);
   if (type) params.append("type", type);
   if (search) params.append("search", search);
+  if (startDate) params.append("start_date", startDate);
+  if (endDate) params.append("end_date", endDate);
 
   const response = await fetch(`${API_BASE_URL}/transactions?${params}`, {
     cache: "no-store",

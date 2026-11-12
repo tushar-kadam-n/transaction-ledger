@@ -1,5 +1,6 @@
 
 from typing import Literal
+from datetime import date, datetime, time, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -67,6 +68,8 @@ def _query_transaction_history(
     page: int = 1,
     limit: int = 10,
     search: str | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ):
     if account_id is not None and db.get(Account, account_id) is None:
         raise HTTPException(
@@ -101,6 +104,20 @@ def _query_transaction_history(
         statement = statement.where(search_filter)
         count_statement = count_statement.where(search_filter)
 
+    if start_date is not None:
+        start_boundary = datetime.combine(start_date, time.min)
+        statement = statement.where(Transaction.transaction_date >= start_boundary)
+        count_statement = count_statement.where(
+            Transaction.transaction_date >= start_boundary
+        )
+
+    if end_date is not None:
+        end_boundary = datetime.combine(end_date + timedelta(days=1), time.min)
+        statement = statement.where(Transaction.transaction_date < end_boundary)
+        count_statement = count_statement.where(
+            Transaction.transaction_date < end_boundary
+        )
+
     total_records = db.execute(count_statement).scalar_one()
     rows = db.execute(
         statement
@@ -123,12 +140,14 @@ def get_all_transaction_history(
     account_id: UUID | None = Query(default=None),
     type: Literal["credit", "debit"] | None = Query(default=None),
     search: str | None = Query(default=None),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
     history = _query_transaction_history(
-        db, account_id, type, page, limit, search
+        db, account_id, type, page, limit, search, start_date, end_date
     )
 
     return {

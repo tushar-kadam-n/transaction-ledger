@@ -821,6 +821,27 @@ h2 {
   outline-offset: 1px;
 }
 
+.history-filters input[type="date"] {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+}
+
+.history-filters input[type="date"]:focus {
+  outline: 2px solid #8ed9ba;
+  outline-offset: 1px;
+}
+
+.history-clear-dates {
+  align-self: end;
+  min-height: 42px;
+}
+
 .history-content>.muted {
   color: #536477;
 }
