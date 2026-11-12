@@ -6,23 +6,21 @@ import {
   getAllTransactions,
   exportTransactionsCsv,
 } from "./api";
-import { ACCOUNT_TYPE_OPTIONS } from "./constants/accountTypes";
 import { NAVIGATION_TABS, type NavigationTab } from "./constants/navigation";
 import {
   CURRENCY_SYMBOL,
   HISTORY_PAGE_SIZE,
   OVERVIEW_RECENT_TRANSACTION_LIMIT,
   TRANSACTION_DISPLAY_LOCALE,
-  TRANSACTION_TYPE_OPTIONS,
 } from "./constants/transaction";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
-import type {
-  Account,
-  AccountFormErrors,
-  NewAccount,
-  AccountType,
-} from "./types/account";
+import { AccountCard } from "./components/accounts/AccountCard";
+import { AccountForm } from "./components/accounts/AccountForm";
+import { TransactionForm } from "./components/transactions/TransactionForm";
+import { HistoryPage } from "./features/history/HistoryPage";
+import { OverviewPage } from "./features/overview/OverviewPage";
+import type { Account, AccountFormErrors, NewAccount } from "./types/account";
 import type {
   GlobalTransactionHistoryResponse,
   TransactionHistoryItem,
@@ -42,9 +40,8 @@ function App() {
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [accountsError, setAccountsError] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("");
-  const [transactionType, setTransactionType] = useState<TransactionType>(
-    "credit",
-  );
+  const [transactionType, setTransactionType] =
+    useState<TransactionType>("credit");
   const [amount, setAmount] = useState("");
   const [amountTouched, setAmountTouched] = useState(false);
   const [description, setDescription] = useState("");
@@ -342,7 +339,9 @@ function App() {
       setHistoryExportMessage("CSV export downloaded.");
     } catch (error) {
       setHistoryExportError(
-        error instanceof Error ? error.message : "Unable to export transactions.",
+        error instanceof Error
+          ? error.message
+          : "Unable to export transactions.",
       );
     } finally {
       setHistoryExporting(false);
@@ -420,6 +419,11 @@ function App() {
     }
   }
 
+  function handleAccountFormValuesChange(values: NewAccount) {
+    setNewAccount(values);
+    setAccountFormErrors({});
+  }
+
   return (
     <div className="app">
       <Sidebar activeTab={activeTab} onNavigate={setActiveTab} />
@@ -428,324 +432,32 @@ function App() {
         <TopBar pageTitle={activeTab} />
 
         {activeTab === "Overview" && (
-          <section>
-            <div className="welcome">
-              <div>
-                <p className="eyebrow">ACCOUNT CENTER</p>
-                <h2>Manage your money with clarity.</h2>
-                <p>
-                  Track account balances and financial transactions in one
-                  place.
-                </p>
-              </div>
-              <div className="welcome-mark">{CURRENCY_SYMBOL}</div>
-            </div>
-
-            <div className="stats">
-              <article className="stat-card">
-                <p>Total Accounts</p>
-                <h3>{totalAccounts}</h3>
-                <span>Connected to your ledger</span>
-              </article>
-
-              <article className="stat-card">
-                <p>Total Balance</p>
-                <h3>
-                  {CURRENCY_SYMBOL} {totalBalance.toFixed(2)}
-                </h3>
-                <span>Combined account balance</span>
-              </article>
-
-              <article className="stat-card">
-                <p>Total Transactions</p>
-                <h3>{totalTransactions}</h3>
-                <span>Across all accounts</span>
-              </article>
-            </div>
-
-            <div className="overview-bottom">
-              <section className="content-card overview-accounts">
-                <div className="overview-section-header">
-                  <div>
-                    <p className="eyebrow">GET STARTED</p>
-                    <h2>Your ledger, at a glance.</h2>
-                    <p className="muted">Manage your accounts and balances.</p>
-                  </div>
-
-                  <button
-                    className="primary-button"
-                    onClick={() => setActiveTab("Accounts")}
-                  >
-                    Manage accounts →
-                  </button>
-                </div>
-
-                {loadingAccounts && (
-                  <p className="muted">Loading accounts...</p>
-                )}
-
-                {accountsError && (
-                  <p className="error-message">{accountsError}</p>
-                )}
-
-                {!loadingAccounts &&
-                  !accountsError &&
-                  accounts.length === 0 && (
-                    <div className="empty-state">
-                      No accounts found. Create your first account.
-                    </div>
-                  )}
-
-                <div className="accounts-grid">
-                  {accounts.map((account) => (
-                    <article
-                      className="stat-card overview-account-card"
-                      key={account.id}
-                    >
-                      <p>Account name</p>
-                      <h3>{account.name}</h3>
-                      <span>
-                        {`Balance: ${CURRENCY_SYMBOL}${Number(account.balance).toFixed(2)}`}
-                      </span>
-                      <p className="muted account-id">
-                        {account.account_type.replace("_", " ")} account
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
-              <section className="content-card recent-transactions">
-                <div className="overview-section-header">
-                  <div>
-                    <p className="eyebrow">ACTIVITY</p>
-                    <h2>Recent Transactions</h2>
-                    <p className="muted">Your latest financial activity.</p>
-                  </div>
-
-                  <button
-                    className="secondary-button"
-                    onClick={() => setActiveTab("History")}
-                  >
-                    View history →
-                  </button>
-                </div>
-
-                {recentTransactions.length === 0 ? (
-                  <div className="empty-state">No transactions available.</div>
-                ) : (
-                  <div className="recent-transaction-list">
-                    {recentTransactions.map((transaction) => (
-                      <article
-                        className="recent-transaction-item"
-                        key={transaction.id}
-                      >
-                        <div className="transaction-info">
-                          <h3>{transaction.description}</h3>
-                          <p>{transaction.account_name}</p>
-                          <span>
-                            {new Date(transaction.created_at).toLocaleString(
-                              TRANSACTION_DISPLAY_LOCALE,
-                            )}
-                          </span>
-                        </div>
-
-                        <div className="transaction-amount">
-                          <span
-                            className={`transaction-badge ${transaction.type}`}
-                          >
-                            {transaction.type.toUpperCase()}
-                          </span>
-                          <strong>
-                            {transaction.type === "debit" ? "−" : "+"}
-                            {`${CURRENCY_SYMBOL}${Number(transaction.amount).toFixed(2)}`}
-                          </strong>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-              </section>
-            </div>
-          </section>
+          <OverviewPage
+            accounts={accounts}
+            totalAccounts={totalAccounts}
+            totalBalance={totalBalance}
+            totalTransactions={totalTransactions}
+            recentTransactions={recentTransactions}
+            loadingAccounts={loadingAccounts}
+            accountsError={accountsError}
+            currencySymbol={CURRENCY_SYMBOL}
+            displayLocale={TRANSACTION_DISPLAY_LOCALE}
+            onManageAccounts={() => setActiveTab("Accounts")}
+            onViewHistory={() => setActiveTab("History")}
+          />
         )}
 
         {activeTab === "Accounts" && (
           <>
-            <form
-              className="account-create-form"
+            <AccountForm
+              values={newAccount}
+              errors={accountFormErrors}
+              isSubmitting={creatingAccount}
+              successMessage={accountCreateMessage}
+              errorMessage={accountCreateError}
+              onValuesChange={handleAccountFormValuesChange}
               onSubmit={handleCreateAccount}
-              noValidate
-            >
-              <h3>Create New Account</h3>
-
-              <div className="account-form-field">
-                <label htmlFor="new-account-name">Account Name</label>
-                <input
-                  id="new-account-name"
-                  type="text"
-                  required
-                  maxLength={150}
-                  placeholder="Enter account name"
-                  value={newAccount.name}
-                  aria-invalid={Boolean(accountFormErrors.name)}
-                  aria-describedby={
-                    accountFormErrors.name ? "account-name-error" : undefined
-                  }
-                  onChange={(e) => {
-                    setNewAccount({ ...newAccount, name: e.target.value });
-                    setAccountFormErrors({});
-                  }}
-                />
-                {accountFormErrors.name && (
-                  <span
-                    className="field-error"
-                    id="account-name-error"
-                    role="alert"
-                  >
-                    {accountFormErrors.name}
-                  </span>
-                )}
-              </div>
-
-              <div className="account-form-field">
-                <label htmlFor="new-account-type">Account Type</label>
-                <select
-                  id="new-account-type"
-                  required
-                  value={newAccount.account_type}
-                  aria-invalid={Boolean(accountFormErrors.account_type)}
-                  aria-describedby={
-                    accountFormErrors.account_type
-                      ? "account-type-error"
-                      : undefined
-                  }
-                  onChange={(e) => {
-                    setNewAccount({
-                      ...newAccount,
-                      account_type: e.target.value as AccountType | "",
-                    });
-                    setAccountFormErrors({});
-                  }}
-                >
-                  <option value="">Select account type</option>
-                  {ACCOUNT_TYPE_OPTIONS.map((accountType) => (
-                    <option key={accountType.value} value={accountType.value}>
-                      {accountType.label}
-                    </option>
-                  ))}
-                </select>
-                {accountFormErrors.account_type && (
-                  <span
-                    className="field-error"
-                    id="account-type-error"
-                    role="alert"
-                  >
-                    {accountFormErrors.account_type}
-                  </span>
-                )}
-              </div>
-
-              <div className="account-form-field">
-                <label htmlFor="new-account-email">
-                  Email Address (optional)
-                </label>
-                <input
-                  id="new-account-email"
-                  type="email"
-                  maxLength={254}
-                  placeholder="name@example.com"
-                  value={newAccount.email}
-                  aria-invalid={Boolean(accountFormErrors.email)}
-                  aria-describedby={
-                    accountFormErrors.email ? "account-email-error" : undefined
-                  }
-                  onChange={(e) => {
-                    setNewAccount({ ...newAccount, email: e.target.value });
-                    setAccountFormErrors({});
-                  }}
-                />
-                {accountFormErrors.email && (
-                  <span
-                    className="field-error"
-                    id="account-email-error"
-                    role="alert"
-                  >
-                    {accountFormErrors.email}
-                  </span>
-                )}
-              </div>
-
-              <div className="account-form-field">
-                <label htmlFor="new-account-phone">
-                  Phone Number (optional)
-                </label>
-                <input
-                  id="new-account-phone"
-                  type="tel"
-                  maxLength={32}
-                  placeholder="+1 555 123 4567"
-                  value={newAccount.phone}
-                  aria-invalid={Boolean(accountFormErrors.phone)}
-                  aria-describedby={
-                    accountFormErrors.phone ? "account-phone-error" : undefined
-                  }
-                  onChange={(e) => {
-                    setNewAccount({ ...newAccount, phone: e.target.value });
-                    setAccountFormErrors({});
-                  }}
-                />
-                {accountFormErrors.phone && (
-                  <span
-                    className="field-error"
-                    id="account-phone-error"
-                    role="alert"
-                  >
-                    {accountFormErrors.phone}
-                  </span>
-                )}
-              </div>
-
-              <div className="account-form-field account-form-field-wide">
-                <label htmlFor="new-account-description">
-                  Description (optional)
-                </label>
-                <textarea
-                  id="new-account-description"
-                  rows={2}
-                  maxLength={2000}
-                  placeholder="Add a note about this account"
-                  value={newAccount.description}
-                  onChange={(e) => {
-                    setNewAccount({
-                      ...newAccount,
-                      description: e.target.value,
-                    });
-                    setAccountFormErrors({});
-                  }}
-                />
-              </div>
-
-              <div
-                className="account-initial-balance"
-                aria-label="Initial balance is zero rupees"
-              >
-                <span>Initial Balance</span>
-                <strong>{CURRENCY_SYMBOL}0.00</strong>
-              </div>
-
-              <button type="submit" disabled={creatingAccount}>
-                {creatingAccount ? "Creating..." : "Create Account"}
-              </button>
-
-              {accountCreateMessage && (
-                <p className="success-message">{accountCreateMessage}</p>
-              )}
-
-              {accountCreateError && (
-                <p className="error-message">{accountCreateError}</p>
-              )}
-            </form>
+            />
             <section className="content-card accounts-content">
               <div>
                 <p className="eyebrow">ACCOUNT MANAGEMENT</p>
@@ -763,16 +475,7 @@ function App() {
 
               <div className="accounts-grid">
                 {accounts.map((account) => (
-                  <article className="stat-card" key={account.id}>
-                    <p>Account name</p>
-                    <h3>{account.name}</h3>
-                    <span>
-                      {`Balance: ${CURRENCY_SYMBOL}${Number(account.balance).toFixed(2)}`}
-                    </span>
-                    <p className="muted">
-                      {account.account_type.replace("_", " ")} account
-                    </p>
-                  </article>
+                  <AccountCard key={account.id} account={account} />
                 ))}
               </div>
             </section>
@@ -787,362 +490,86 @@ function App() {
               <p className="muted">Record a credit or debit transaction.</p>
             </div>
 
-            <form
-              className="transaction-form"
+            <TransactionForm
+              accounts={accounts}
+              selectedAccountId={selectedAccountId}
+              transactionType={transactionType}
+              amount={amount}
+              description={description}
+              referenceId={referenceId}
+              transactionDate={transactionDate}
+              amountError={transactionAmountError}
+              transactionMessage={transactionMessage}
+              transactionError={transactionError}
+              isSubmitting={submitting}
+              isAmountValid={validTransactionAmount}
+              exceedsAvailableBalance={exceedsAvailableBalance}
+              currentBalance={currentTransactionBalance}
+              projectedBalance={projectedTransactionBalance}
               onSubmit={handleCreateTransaction}
-            >
-              {" "}
-              <label>Account</label>
-              <select
-                value={selectedAccountId}
-                onChange={(e) => {
-                  setSelectedAccountId(e.target.value);
-                  setTransactionError("");
-                }}
-              >
-                <option value="">Select account</option>
-                {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name}
-                  </option>
-                ))}
-              </select>
-              {selectedTransactionAccount &&
-                currentTransactionBalance !== null && (
-                  <div className="transaction-balance-panels">
-                    <div className="balance-panel current-balance-panel">
-                      <span>Current Balance</span>
-                      <strong>
-                        {`${CURRENCY_SYMBOL}${currentTransactionBalance.toFixed(2)}`}
-                      </strong>
-                    </div>
-                    <div
-                      className={`balance-panel projected-balance-panel ${transactionType}`}
-                    >
-                      <span>Projected Balance</span>
-                      <strong>
-                        {projectedTransactionBalance === null
-                          ? "Enter a valid amount"
-                          : `${CURRENCY_SYMBOL}${projectedTransactionBalance.toFixed(2)}`}
-                      </strong>
-                    </div>
-                  </div>
-                )}
-              <label>Transaction Type</label>
-              <select
-                value={transactionType}
-                onChange={(e) => {
-                  setTransactionType(e.target.value as TransactionType);
-                  setTransactionError("");
-                }}
-              >
-                {TRANSACTION_TYPE_OPTIONS.map((transactionOption) => (
-                  <option
-                    key={transactionOption.value}
-                    value={transactionOption.value}
-                  >
-                    {transactionOption.label}
-                  </option>
-                ))}
-              </select>
-              <label>Amount</label>
-              <input
-                type="number"
-                value={amount}
-                aria-invalid={Boolean(transactionAmountError)}
-                aria-describedby={
-                  transactionAmountError
-                    ? "transaction-amount-error"
-                    : undefined
-                }
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  setAmountTouched(true);
-                  setTransactionError("");
-                }}
-                onBlur={() => setAmountTouched(true)}
-                placeholder="Enter amount"
-              />
-              {transactionAmountError && (
-                <p
-                  className="amount-validation-message"
-                  id="transaction-amount-error"
-                  role="alert"
-                >
-                  {transactionAmountError}
-                </p>
-              )}
-              <label>Description</label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter transaction description"
-              />
-              <label htmlFor="transaction-date">
-                Transaction Date &amp; Time
-              </label>
-              <input
-                id="transaction-date"
-                type="datetime-local"
-                required
-                value={transactionDate}
-                onChange={(e) => setTransactionDate(e.target.value)}
-              />
-              <label>Reference ID</label>
-              <input
-                type="text"
-                value={referenceId}
-                onChange={(e) => setReferenceId(e.target.value)}
-                placeholder="e.g. REF-001"
-              />
-              {transactionMessage && (
-                <p className="success-message">{transactionMessage}</p>
-              )}
-              {transactionError && (
-                <p className="error-message">{transactionError}</p>
-              )}
-              <button
-                type="submit"
-                className="primary-button"
-                disabled={
-                  submitting ||
-                  !selectedAccountId ||
-                  !validTransactionAmount ||
-                  exceedsAvailableBalance
-                }
-              >
-                {submitting ? "Processing..." : "Create Transaction"}
-              </button>
-            </form>
+              onAccountChange={(accountId) => {
+                setSelectedAccountId(accountId);
+                setTransactionError("");
+              }}
+              onTransactionTypeChange={(type) => {
+                setTransactionType(type);
+                setTransactionError("");
+              }}
+              onAmountChange={(value) => {
+                setAmount(value);
+                setAmountTouched(true);
+                setTransactionError("");
+              }}
+              onAmountBlur={() => setAmountTouched(true)}
+              onDescriptionChange={setDescription}
+              onReferenceIdChange={setReferenceId}
+              onTransactionDateChange={setTransactionDate}
+            />
           </section>
         )}
 
         {activeTab === "History" && (
-          <section className="content-card history-content">
-            <div>
-              <p className="eyebrow">LEDGER RECORDS</p>
-              <h2>Transaction History</h2>
-              <p className="muted">View and track all account transactions.</p>
-            </div>
-
-            <div className="history-filters">
-              <div className="history-search-field">
-                <label htmlFor="history-search">Search transactions</label>
-                <input
-                  id="history-search"
-                  type="search"
-                  placeholder="Search description, reference ID, or account..."
-                  value={historySearch}
-                  onChange={(e) => {
-                    setHistorySearch(e.target.value);
-                  }}
-                />
-              </div>
-              <div>
-                <label htmlFor="history-start-date">From Date</label>
-                <input
-                  id="history-start-date"
-                  type="date"
-                  value={historyStartDate}
-                  max={historyEndDate || undefined}
-                  onChange={(e) => {
-                    setHistoryStartDate(e.target.value);
-                    setHistoryPage(1);
-                  }}
-                />
-              </div>
-              <div>
-                <label htmlFor="history-end-date">To Date</label>
-                <input
-                  id="history-end-date"
-                  type="date"
-                  value={historyEndDate}
-                  min={historyStartDate || undefined}
-                  onChange={(e) => {
-                    setHistoryEndDate(e.target.value);
-                    setHistoryPage(1);
-                  }}
-                />
-              </div>
-              <button
-                type="button"
-                className="secondary-button history-clear-dates"
-                disabled={!historyStartDate && !historyEndDate}
-                onClick={() => {
-                  setHistoryStartDate("");
-                  setHistoryEndDate("");
-                  setHistoryPage(1);
-                }}
-              >
-                Clear dates
-              </button>
-              <div>
-                <label>Account</label>
-                <select
-                  value={historyAccountId}
-                  onChange={(e) => {
-                    setHistoryAccountId(e.target.value);
-                    setHistoryPage(1);
-                  }}
-                >
-                  <option value="">All Accounts</option>
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label>Transaction Type</label>
-                <select
-                  value={historyType}
-                  onChange={(e) => {
-                    setHistoryType(e.target.value as "" | TransactionType);
-                    setHistoryPage(1);
-                  }}
-                >
-                  <option value="">All Transactions</option>
-                  {TRANSACTION_TYPE_OPTIONS.map((transactionOption) => (
-                    <option
-                      key={transactionOption.value}
-                      value={transactionOption.value}
-                    >
-                      {transactionOption.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="primary-button history-export-button"
-              onClick={handleExportTransactions}
-              disabled={historyExporting || invalidHistoryDateRange}
-            >
-              {historyExporting ? "Exporting..." : "Export CSV"}
-            </button>
-
-            {historyExportMessage && (
-              <p className="success-message" role="status">
-                {historyExportMessage}
-              </p>
-            )}
-            {historyExportError && (
-              <p className="error-message" role="alert">
-                {historyExportError}
-              </p>
-            )}
-
-            {invalidHistoryDateRange && (
-              <p className="error-message" role="alert">
-                From Date must be on or before To Date.
-              </p>
-            )}
-
-            {historyLoading && <p className="muted">Loading transactions...</p>}
-
-            {historyError && <p className="error-message">{historyError}</p>}
-
-            {!invalidHistoryDateRange &&
-              !historyLoading &&
-              !historyError &&
-              transactionHistory && (
-              <>
-                <p className="muted">
-                  Total records: {transactionHistory.total_records}
-                </p>
-
-                {transactionHistory.transactions.length === 0 ? (
-                  <div className="empty-state">No transactions found.</div>
-                ) : (
-                  <div className="history-table-wrapper">
-                    <table className="history-table">
-                      <thead>
-                        <tr>
-                          <th>Sr No</th>
-                          <th>Account</th>
-                          <th>Type</th>
-                          <th>Amount</th>
-                          <th>Description</th>
-                          <th>Reference ID</th>
-                          <th>Date &amp; Time</th>
-                        </tr>
-                      </thead>
-
-                      <tbody>
-                        {transactionHistory.transactions.map(
-                          (transaction, index) => (
-                            <tr key={transaction.id}>
-                              <td>
-                                {(transactionHistory.page - 1) *
-                                  transactionHistory.limit +
-                                  index +
-                                  1}
-                              </td>
-
-                              <td>{transaction.account_name}</td>
-
-                              <td>
-                                <span
-                                  className={`transaction-badge ${transaction.type}`}
-                                >
-                                  {transaction.type.toUpperCase()}
-                                </span>
-                              </td>
-
-                              <td>
-                                {`${CURRENCY_SYMBOL}${Number(transaction.amount).toFixed(2)}`}
-                              </td>
-
-                              <td>{transaction.description}</td>
-
-                              <td>{transaction.reference_id?.trim() || "—"}</td>
-
-                              <td>
-                                {new Date(
-                                  transaction.transaction_date,
-                                ).toLocaleString(TRANSACTION_DISPLAY_LOCALE)}
-                              </td>
-                            </tr>
-                          ),
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                <div className="history-pagination">
-                  <button
-                    className="secondary-button"
-                    disabled={historyPage <= 1 || historyLoading}
-                    onClick={() => setHistoryPage((page) => page - 1)}
-                  >
-                    Previous
-                  </button>
-
-                  <span>
-                    Page {transactionHistory.page} of{" "}
-                    {transactionHistory.total_pages}
-                  </span>
-
-                  <button
-                    className="secondary-button"
-                    disabled={
-                      historyPage >= transactionHistory.total_pages ||
-                      historyLoading
-                    }
-                    onClick={() => setHistoryPage((page) => page + 1)}
-                  >
-                    Next
-                  </button>
-                </div>
-              </>
-            )}
-          </section>
+          <HistoryPage
+            accounts={accounts}
+            transactionHistory={transactionHistory}
+            historyPage={historyPage}
+            historyAccountId={historyAccountId}
+            historyType={historyType}
+            historySearch={historySearch}
+            historyStartDate={historyStartDate}
+            historyEndDate={historyEndDate}
+            invalidHistoryDateRange={invalidHistoryDateRange}
+            historyLoading={historyLoading}
+            historyError={historyError}
+            historyExporting={historyExporting}
+            historyExportError={historyExportError}
+            historyExportMessage={historyExportMessage}
+            onAccountChange={(accountId) => {
+              setHistoryAccountId(accountId);
+              setHistoryPage(1);
+            }}
+            onTypeChange={(type) => {
+              setHistoryType(type);
+              setHistoryPage(1);
+            }}
+            onSearchChange={setHistorySearch}
+            onStartDateChange={(date) => {
+              setHistoryStartDate(date);
+              setHistoryPage(1);
+            }}
+            onEndDateChange={(date) => {
+              setHistoryEndDate(date);
+              setHistoryPage(1);
+            }}
+            onClearDates={() => {
+              setHistoryStartDate("");
+              setHistoryEndDate("");
+              setHistoryPage(1);
+            }}
+            onExport={handleExportTransactions}
+            onPreviousPage={() => setHistoryPage((page) => page - 1)}
+            onNextPage={() => setHistoryPage((page) => page + 1)}
+          />
         )}
       </main>
     </div>
