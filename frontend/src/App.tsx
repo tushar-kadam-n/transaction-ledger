@@ -4,6 +4,7 @@ import {
   createAccount,
   createTransaction,
   getAllTransactions,
+  exportTransactionsCsv,
 } from "./api";
 import type {
   GlobalTransactionHistoryResponse,
@@ -68,6 +69,9 @@ function App() {
 
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
+  const [historyExporting, setHistoryExporting] = useState(false);
+  const [historyExportError, setHistoryExportError] = useState("");
+  const [historyExportMessage, setHistoryExportMessage] = useState("");
 
   const [historyType, setHistoryType] = useState<"" | "credit" | "debit">("");
   const [historyAccountId, setHistoryAccountId] = useState("");
@@ -319,6 +323,37 @@ function App() {
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleExportTransactions() {
+    setHistoryExportError("");
+    setHistoryExportMessage("");
+    setHistoryExporting(true);
+
+    try {
+      const csv = await exportTransactionsCsv({
+        accountId: historyAccountId || undefined,
+        type: historyType || undefined,
+        search: debouncedHistorySearch || undefined,
+        startDate: historyStartDate || undefined,
+        endDate: historyEndDate || undefined,
+      });
+      const downloadUrl = URL.createObjectURL(csv);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = "transactions.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      setHistoryExportMessage("CSV export downloaded.");
+    } catch (error) {
+      setHistoryExportError(
+        error instanceof Error ? error.message : "Unable to export transactions.",
+      );
+    } finally {
+      setHistoryExporting(false);
     }
   }
 
@@ -1007,6 +1042,26 @@ function App() {
                 </select>
               </div>
             </div>
+
+            <button
+              type="button"
+              className="primary-button history-export-button"
+              onClick={handleExportTransactions}
+              disabled={historyExporting || invalidHistoryDateRange}
+            >
+              {historyExporting ? "Exporting..." : "Export CSV"}
+            </button>
+
+            {historyExportMessage && (
+              <p className="success-message" role="status">
+                {historyExportMessage}
+              </p>
+            )}
+            {historyExportError && (
+              <p className="error-message" role="alert">
+                {historyExportError}
+              </p>
+            )}
 
             {invalidHistoryDateRange && (
               <p className="error-message" role="alert">

@@ -1,6 +1,8 @@
 
-from typing import Literal
+import csv
 from datetime import date, datetime, time, timedelta
+from io import StringIO
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -16,7 +18,7 @@ from app.schemas.transaction import (
     TransactionResponse,
 )
 from app.services.ledger import add_transaction
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 router = APIRouter(prefix="/api/accounts", tags=["Transactions"])
 global_router = APIRouter(prefix="/api", tags=["Transactions"])
 
@@ -70,6 +72,7 @@ def _query_transaction_history(
     search: str | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
+    paginate: bool = True,
 ):
     if account_id is not None and db.get(Account, account_id) is None:
         raise HTTPException(
@@ -119,12 +122,12 @@ def _query_transaction_history(
         )
 
     total_records = db.execute(count_statement).scalar_one()
-    rows = db.execute(
-        statement
-        .order_by(Transaction.created_at.desc(), Transaction.id.desc())
-        .offset((page - 1) * limit)
-        .limit(limit)
-    ).all()
+    statement = statement.order_by(
+        Transaction.created_at.desc(), Transaction.id.desc()
+    )
+    if paginate:
+        statement = statement.offset((page - 1) * limit).limit(limit)
+    rows = db.execute(statement).all()
 
     return {
         "page": page,
@@ -133,6 +136,66 @@ def _query_transaction_history(
         "total_pages": (total_records + limit - 1) // limit,
         "rows": rows,
     }
+
+
+def _spreadsheet_safe(value: str) -> str:
+    if value.lstrip().startswith(("=", "+", "-", "@")):
+        return f"'{value}"
+    return value
+
+
+@global_router.get("/transactions/export")
+def export_transaction_history(
+    account_id: UUID | None = Query(default=None),
+    type: Literal["credit", "debit"] | None = Query(default=None),
+    search: str | None = Query(default=None),
+    start_date: date | None = Query(default=None),
+    end_date: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    history = _query_transaction_history(
+        db,
+        account_id,
+        type,
+        search=search,
+        start_date=start_date,
+        end_date=end_date,
+        paginate=False,
+    )
+    csv_file = StringIO(newline="")
+    writer = csv.writer(csv_file)
+    writer.writerow(
+        [
+            "Sr No",
+            "Account Name",
+            "Transaction Date & Time",
+            "Type",
+            "Amount",
+            "Description",
+            "Reference ID",
+        ]
+    )
+
+    for row_number, (transaction, account_name) in enumerate(history["rows"], 1):
+        transaction_date = transaction.transaction_date
+        writer.writerow(
+            [
+                row_number,
+                _spreadsheet_safe(account_name),
+                transaction_date.isoformat(sep=" ", timespec="seconds"),
+                transaction.type,
+                f"₹{transaction.amount:,.2f}",
+                _spreadsheet_safe(transaction.description),
+                _spreadsheet_safe(transaction.reference_id or ""),
+            ]
+        )
+
+    content = "\ufeff" + csv_file.getvalue()
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="transactions.csv"'},
+    )
 
 
 @global_router.get("/transactions")
