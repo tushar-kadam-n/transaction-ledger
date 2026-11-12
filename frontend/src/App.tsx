@@ -6,10 +6,26 @@ import {
   getAllTransactions,
   exportTransactionsCsv,
 } from "./api";
+import { ACCOUNT_TYPE_OPTIONS } from "./constants/accountTypes";
+import { NAVIGATION_TABS, type NavigationTab } from "./constants/navigation";
+import {
+  CURRENCY_SYMBOL,
+  HISTORY_PAGE_SIZE,
+  OVERVIEW_RECENT_TRANSACTION_LIMIT,
+  TRANSACTION_DISPLAY_LOCALE,
+  TRANSACTION_TYPE_OPTIONS,
+} from "./constants/transaction";
+import type {
+  Account,
+  AccountFormErrors,
+  NewAccount,
+  AccountType,
+} from "./types/account";
 import type {
   GlobalTransactionHistoryResponse,
   TransactionHistoryItem,
-} from "./api";
+  TransactionType,
+} from "./types/transaction";
 import "./App.css";
 
 function currentLocalDateTime() {
@@ -18,42 +34,13 @@ function currentLocalDateTime() {
   return localNow.toISOString().slice(0, 16);
 }
 
-type Account = {
-  id: string;
-  name: string;
-  account_type: "savings" | "current" | "cash" | "digital_wallet" | "business";
-  email: string | null;
-  phone: string | null;
-  description: string | null;
-  balance: number | string;
-};
-
-type NewAccount = {
-  name: string;
-  account_type: NewAccountType | "";
-  email: string;
-  phone: string;
-  description: string;
-};
-
-type NewAccountType =
-  | "savings"
-  | "current"
-  | "cash"
-  | "digital_wallet"
-  | "business";
-
-type AccountFormErrors = Partial<Record<keyof NewAccount, string>>;
-
-type Tab = "Overview" | "Accounts" | "Transactions" | "History";
-
 function App() {
-  const [activeTab, setActiveTab] = useState<Tab>("Overview");
+  const [activeTab, setActiveTab] = useState<NavigationTab>(NAVIGATION_TABS[0]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [accountsError, setAccountsError] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("");
-  const [transactionType, setTransactionType] = useState<"credit" | "debit">(
+  const [transactionType, setTransactionType] = useState<TransactionType>(
     "credit",
   );
   const [amount, setAmount] = useState("");
@@ -73,7 +60,7 @@ function App() {
   const [historyExportError, setHistoryExportError] = useState("");
   const [historyExportMessage, setHistoryExportMessage] = useState("");
 
-  const [historyType, setHistoryType] = useState<"" | "credit" | "debit">("");
+  const [historyType, setHistoryType] = useState<"" | TransactionType>("");
   const [historyAccountId, setHistoryAccountId] = useState("");
   const [historySearch, setHistorySearch] = useState("");
   const [debouncedHistorySearch, setDebouncedHistorySearch] = useState("");
@@ -81,7 +68,7 @@ function App() {
   const [historyEndDate, setHistoryEndDate] = useState("");
 
   const [historyPage, setHistoryPage] = useState(1);
-  const [historyLimit] = useState(5);
+  const historyLimit = HISTORY_PAGE_SIZE;
   const invalidHistoryDateRange = Boolean(
     historyStartDate && historyEndDate && historyStartDate > historyEndDate,
   );
@@ -111,7 +98,7 @@ function App() {
   const [recentTransactions, setRecentTransactions] = useState<
     TransactionHistoryItem[]
   >([]);
-  const lastOverviewRequestTab = useRef<Tab | null>(null);
+  const lastOverviewRequestTab = useRef<NavigationTab | null>(null);
   const totalAccounts = accounts.length;
 
   const totalBalance = accounts.reduce(
@@ -196,7 +183,10 @@ function App() {
 
     async function loadOverviewTransactions() {
       try {
-        const result = await getAllTransactions(1, 5);
+        const result = await getAllTransactions(
+          1,
+          OVERVIEW_RECENT_TRANSACTION_LIMIT,
+        );
         setRecentTransactions(result.transactions);
         setTotalTransactions(result.total_records);
       } catch (error) {
@@ -439,17 +429,15 @@ function App() {
         <p className="nav-label">WORKSPACE</p>
 
         <nav>
-          {(["Overview", "Accounts", "Transactions", "History"] as Tab[]).map(
-            (tab) => (
-              <button
-                key={tab}
-                className={`nav-item ${activeTab === tab ? "active" : ""}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
-            ),
-          )}
+          {NAVIGATION_TABS.map((tab) => (
+            <button
+              key={tab}
+              className={`nav-item ${activeTab === tab ? "active" : ""}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tab}
+            </button>
+          ))}
         </nav>
 
         <div className="sidebar-footer">
@@ -482,7 +470,7 @@ function App() {
                   place.
                 </p>
               </div>
-              <div className="welcome-mark">₹</div>
+              <div className="welcome-mark">{CURRENCY_SYMBOL}</div>
             </div>
 
             <div className="stats">
@@ -494,7 +482,9 @@ function App() {
 
               <article className="stat-card">
                 <p>Total Balance</p>
-                <h3>₹ {totalBalance.toFixed(2)}</h3>
+                <h3>
+                  {CURRENCY_SYMBOL} {totalBalance.toFixed(2)}
+                </h3>
                 <span>Combined account balance</span>
               </article>
 
@@ -547,7 +537,7 @@ function App() {
                       <p>Account name</p>
                       <h3>{account.name}</h3>
                       <span>
-                        Balance: ₹{Number(account.balance).toFixed(2)}
+                        {`Balance: ${CURRENCY_SYMBOL}${Number(account.balance).toFixed(2)}`}
                       </span>
                       <p className="muted account-id">
                         {account.account_type.replace("_", " ")} account
@@ -587,7 +577,7 @@ function App() {
                           <p>{transaction.account_name}</p>
                           <span>
                             {new Date(transaction.created_at).toLocaleString(
-                              "en-IN",
+                              TRANSACTION_DISPLAY_LOCALE,
                             )}
                           </span>
                         </div>
@@ -599,8 +589,8 @@ function App() {
                             {transaction.type.toUpperCase()}
                           </span>
                           <strong>
-                            {transaction.type === "debit" ? "−" : "+"}₹
-                            {Number(transaction.amount).toFixed(2)}
+                            {transaction.type === "debit" ? "−" : "+"}
+                            {`${CURRENCY_SYMBOL}${Number(transaction.amount).toFixed(2)}`}
                           </strong>
                         </div>
                       </article>
@@ -665,17 +655,17 @@ function App() {
                   onChange={(e) => {
                     setNewAccount({
                       ...newAccount,
-                      account_type: e.target.value as NewAccountType | "",
+                      account_type: e.target.value as AccountType | "",
                     });
                     setAccountFormErrors({});
                   }}
                 >
                   <option value="">Select account type</option>
-                  <option value="savings">Savings</option>
-                  <option value="current">Current</option>
-                  <option value="cash">Cash</option>
-                  <option value="digital_wallet">Digital Wallet</option>
-                  <option value="business">Business</option>
+                  {ACCOUNT_TYPE_OPTIONS.map((accountType) => (
+                    <option key={accountType.value} value={accountType.value}>
+                      {accountType.label}
+                    </option>
+                  ))}
                 </select>
                 {accountFormErrors.account_type && (
                   <span
@@ -773,7 +763,7 @@ function App() {
                 aria-label="Initial balance is zero rupees"
               >
                 <span>Initial Balance</span>
-                <strong>₹0.00</strong>
+                <strong>{CURRENCY_SYMBOL}0.00</strong>
               </div>
 
               <button type="submit" disabled={creatingAccount}>
@@ -808,7 +798,9 @@ function App() {
                   <article className="stat-card" key={account.id}>
                     <p>Account name</p>
                     <h3>{account.name}</h3>
-                    <span>Balance: ₹{Number(account.balance).toFixed(2)}</span>
+                    <span>
+                      {`Balance: ${CURRENCY_SYMBOL}${Number(account.balance).toFixed(2)}`}
+                    </span>
                     <p className="muted">
                       {account.account_type.replace("_", " ")} account
                     </p>
@@ -852,7 +844,9 @@ function App() {
                   <div className="transaction-balance-panels">
                     <div className="balance-panel current-balance-panel">
                       <span>Current Balance</span>
-                      <strong>₹{currentTransactionBalance.toFixed(2)}</strong>
+                      <strong>
+                        {`${CURRENCY_SYMBOL}${currentTransactionBalance.toFixed(2)}`}
+                      </strong>
                     </div>
                     <div
                       className={`balance-panel projected-balance-panel ${transactionType}`}
@@ -861,7 +855,7 @@ function App() {
                       <strong>
                         {projectedTransactionBalance === null
                           ? "Enter a valid amount"
-                          : `₹${projectedTransactionBalance.toFixed(2)}`}
+                          : `${CURRENCY_SYMBOL}${projectedTransactionBalance.toFixed(2)}`}
                       </strong>
                     </div>
                   </div>
@@ -870,12 +864,18 @@ function App() {
               <select
                 value={transactionType}
                 onChange={(e) => {
-                  setTransactionType(e.target.value as "credit" | "debit");
+                  setTransactionType(e.target.value as TransactionType);
                   setTransactionError("");
                 }}
               >
-                <option value="credit">Credit</option>
-                <option value="debit">Debit</option>
+                {TRANSACTION_TYPE_OPTIONS.map((transactionOption) => (
+                  <option
+                    key={transactionOption.value}
+                    value={transactionOption.value}
+                  >
+                    {transactionOption.label}
+                  </option>
+                ))}
               </select>
               <label>Amount</label>
               <input
@@ -1032,13 +1032,19 @@ function App() {
                 <select
                   value={historyType}
                   onChange={(e) => {
-                    setHistoryType(e.target.value as "" | "credit" | "debit");
+                    setHistoryType(e.target.value as "" | TransactionType);
                     setHistoryPage(1);
                   }}
                 >
                   <option value="">All Transactions</option>
-                  <option value="credit">Credit</option>
-                  <option value="debit">Debit</option>
+                  {TRANSACTION_TYPE_OPTIONS.map((transactionOption) => (
+                    <option
+                      key={transactionOption.value}
+                      value={transactionOption.value}
+                    >
+                      {transactionOption.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -1120,7 +1126,9 @@ function App() {
                                 </span>
                               </td>
 
-                              <td>₹{Number(transaction.amount).toFixed(2)}</td>
+                              <td>
+                                {`${CURRENCY_SYMBOL}${Number(transaction.amount).toFixed(2)}`}
+                              </td>
 
                               <td>{transaction.description}</td>
 
@@ -1129,7 +1137,7 @@ function App() {
                               <td>
                                 {new Date(
                                   transaction.transaction_date,
-                                ).toLocaleString("en-IN")}
+                                ).toLocaleString(TRANSACTION_DISPLAY_LOCALE)}
                               </td>
                             </tr>
                           ),

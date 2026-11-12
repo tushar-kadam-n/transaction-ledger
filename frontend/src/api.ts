@@ -1,6 +1,16 @@
+import type { Account, CreateAccountPayload } from "./types/account";
+import type {
+  CreateTransactionResponse,
+  GlobalTransactionHistoryResponse,
+  TransactionExportFilters,
+  TransactionHistoryResponse,
+  TransactionPayload,
+  TransactionType,
+} from "./types/transaction";
+
 const API_BASE_URL = "/api";
 
-export async function getAccounts() {
+export async function getAccounts(): Promise<Account[]> {
   const response = await fetch(`${API_BASE_URL}/accounts`, {
     cache: "no-store",
   });
@@ -9,21 +19,13 @@ export async function getAccounts() {
     throw new Error(`Failed to fetch accounts: ${response.status}`);
   }
 
-  return response.json();
+  return (await response.json()) as Account[];
 }
-
-export type TransactionPayload = {
-  type: "credit" | "debit";
-  amount: string;
-  description: string;
-  reference_id: string;
-  transaction_date: string;
-};
 
 export async function createTransaction(
   accountId: string,
   transaction: TransactionPayload,
-) {
+): Promise<CreateTransactionResponse> {
   const response = await fetch(
     `${API_BASE_URL}/accounts/${accountId}/transactions`,
     {
@@ -41,44 +43,14 @@ export async function createTransaction(
     throw new Error(data.detail || `Transaction failed: ${response.status}`);
   }
 
-  return data;
+  return data as CreateTransactionResponse;
 }
-
-export type Transaction = {
-  id: string;
-  account_id: string;
-  type: "credit" | "debit";
-  amount: string;
-  description: string;
-  reference_id: string | null;
-  transaction_date: string;
-  created_at: string;
-};
-
-export type TransactionHistoryItem = Transaction & { account_name: string };
-
-export type TransactionHistoryResponse = {
-  account_id: string;
-  page: number;
-  limit: number;
-  total_records: number;
-  total_pages: number;
-  transactions: Transaction[];
-};
-
-export type GlobalTransactionHistoryResponse = {
-  page: number;
-  limit: number;
-  total_records: number;
-  total_pages: number;
-  transactions: TransactionHistoryItem[];
-};
 
 export async function getTransactions(
   accountId: string,
   page = 1,
   limit = 10,
-  type?: "credit" | "debit",
+  type?: TransactionType,
 ): Promise<TransactionHistoryResponse> {
   const history = await getAllTransactions(page, limit, accountId, type);
 
@@ -92,7 +64,7 @@ export async function getAllTransactions(
   page = 1,
   limit = 10,
   accountId?: string,
-  type?: "credit" | "debit",
+  type?: TransactionType,
   search?: string,
   startDate?: string,
   endDate?: string,
@@ -135,13 +107,9 @@ export async function getAllTransactions(
   return data as GlobalTransactionHistoryResponse;
 }
 
-export async function exportTransactionsCsv(filters: {
-  accountId?: string;
-  type?: "credit" | "debit";
-  search?: string;
-  startDate?: string;
-  endDate?: string;
-}): Promise<Blob> {
+export async function exportTransactionsCsv(
+  filters: TransactionExportFilters,
+): Promise<Blob> {
   const params = new URLSearchParams();
   if (filters.accountId) params.set("account_id", filters.accountId);
   if (filters.type) params.set("type", filters.type);
@@ -170,15 +138,9 @@ export async function exportTransactionsCsv(filters: {
   return response.blob();
 }
 
-export type CreateAccountPayload = {
-  name: string;
-  account_type: "savings" | "current" | "cash" | "digital_wallet" | "business";
-  email?: string;
-  phone?: string;
-  description?: string;
-};
-
-export async function createAccount(payload: CreateAccountPayload) {
+export async function createAccount(
+  payload: CreateAccountPayload,
+): Promise<Account> {
   const response = await fetch(`${API_BASE_URL}/accounts`, {
     method: "POST",
     headers: {
@@ -195,5 +157,5 @@ export async function createAccount(payload: CreateAccountPayload) {
     );
   }
 
-  return data;
+  return data as Account;
 }
