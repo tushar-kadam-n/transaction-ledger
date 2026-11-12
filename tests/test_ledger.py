@@ -1,4 +1,6 @@
 
+import csv
+from io import StringIO
 import uuid
 from datetime import datetime, timezone
 
@@ -475,3 +477,106 @@ def test_transaction_history_date_range_filters_and_counts(client):
     assert [row["created_at"] for row in all_rows] == sorted(
         (row["created_at"] for row in all_rows), reverse=True
     )
+
+
+def test_transaction_history_csv_export_filters_and_all_matching_rows(client):
+    account_a = create_account(client, "CSV Account A")
+    account_b = create_account(client, "CSV Account B")
+    date_value = "2026-05-14T09:30:00+00:00"
+    exported_description = '=SUM(1,2), spreadsheet test\ncontinued'
+
+    for index in range(6):
+        response = client.post(
+            f"/api/accounts/{account_a}/transactions",
+            json={
+                "type": "credit",
+                "amount": "10.00",
+                "description": exported_description if index == 0 else f"CSV credit {index}",
+                "reference_id": f"CSV-{index}-{uuid.uuid4()}",
+                "transaction_date": date_value,
+            },
+        )
+        assert response.status_code == 201
+
+    debit = client.post(
+        f"/api/accounts/{account_a}/transactions",
+        json={
+            "type": "debit",
+            "amount": "5.00",
+            "description": "CSV debit",
+            "reference_id": f"CSV-DEBIT-{uuid.uuid4()}",
+            "transaction_date": date_value,
+        },
+    )
+    other_account = client.post(
+        f"/api/accounts/{account_b}/transactions",
+        json={
+            "type": "credit",
+            "amount": "7.25",
+            "description": "CSV other account",
+            "reference_id": f"CSV-OTHER-{uuid.uuid4()}",
+            "transaction_date": date_value,
+        },
+    )
+    assert debit.status_code == other_account.status_code == 201
+
+    all_response = client.get("/api/transactions/export")
+    assert all_response.status_code == 200
+    assert all_response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in all_response.headers["content-disposition"]
+    assert all_response.content.startswith(b"\xef\xbb\xbf")
+    all_rows = list(csv.reader(StringIO(all_response.content.decode("utf-8-sig"))))
+    assert all_rows[0] == [
+        "Sr No",
+        "Account Name",
+        "Transaction Date & Time",
+        "Type",
+        "Amount",
+        "Description",
+        "Reference ID",
+    ]
+    assert len(all_rows) >= 9  # Header, seven selected-account rows, and other account.
+
+    account_response = client.get(
+        f"/api/transactions/export?account_id={account_a}"
+    )
+    account_rows = list(
+        csv.reader(StringIO(account_response.content.decode("utf-8-sig")))
+    )
+    assert len(account_rows) == 8  # No five-row History page cap on exports.
+    assert all(row[1] == "CSV Account A" for row in account_rows[1:])
+    assert all(row[4].startswith("₹") and "." in row[4] for row in account_rows[1:])
+
+    credit_rows = list(
+        csv.reader(
+            StringIO(
+                client.get(
+                    f"/api/transactions/export?account_id={account_a}&type=credit"
+                ).content.decode("utf-8-sig")
+            )
+        )
+    )
+    debit_rows = list(
+        csv.reader(
+            StringIO(
+                client.get(
+                    f"/api/transactions/export?account_id={account_a}&type=debit"
+                ).content.decode("utf-8-sig")
+            )
+        )
+    )
+    assert len(credit_rows) == 7
+    assert len(debit_rows) == 2
+    assert all(row[3] == "credit" for row in credit_rows[1:])
+    assert all(row[3] == "debit" for row in debit_rows[1:])
+
+    combined = client.get(
+        f"/api/transactions/export?account_id={account_a}&type=credit"
+        "&search=spreadsheet&start_date=2026-05-14&end_date=2026-05-14"
+    )
+    combined_rows = list(
+        csv.reader(StringIO(combined.content.decode("utf-8-sig")))
+    )
+    assert len(combined_rows) == 2
+    assert combined_rows[1][2] == "2026-05-14 09:30:00+00:00"
+    assert combined_rows[1][5] == "'" + exported_description

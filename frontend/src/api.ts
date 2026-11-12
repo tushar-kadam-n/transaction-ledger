@@ -135,6 +135,41 @@ export async function getAllTransactions(
   return data as GlobalTransactionHistoryResponse;
 }
 
+export async function exportTransactionsCsv(filters: {
+  accountId?: string;
+  type?: "credit" | "debit";
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<Blob> {
+  const params = new URLSearchParams();
+  if (filters.accountId) params.set("account_id", filters.accountId);
+  if (filters.type) params.set("type", filters.type);
+  if (filters.search) params.set("search", filters.search);
+  if (filters.startDate) params.set("start_date", filters.startDate);
+  if (filters.endDate) params.set("end_date", filters.endDate);
+
+  const response = await fetch(
+    `${API_BASE_URL}/transactions/export?${params.toString()}`,
+    { cache: "no-store" },
+  );
+
+  if (!response.ok) {
+    const responseBody = await response.text();
+    let detail: string | undefined;
+    try {
+      detail = (JSON.parse(responseBody) as { detail?: string }).detail;
+    } catch {
+      // Keep plain-text API errors readable too.
+    }
+    throw new Error(
+      detail || responseBody || `Failed to export transactions: ${response.status}`,
+    );
+  }
+
+  return response.blob();
+}
+
 export type CreateAccountPayload = {
   name: string;
   account_type: "savings" | "current" | "cash" | "digital_wallet" | "business";
