@@ -423,3 +423,55 @@ def test_create_account_with_contact_details(client, contact_fields):
 def test_create_account_validation(client, payload):
     response = client.post("/api/accounts", json=payload)
     assert response.status_code == 422
+
+
+def test_transaction_history_date_range_filters_and_counts(client):
+    account_id = create_account(client, "Date range account")
+    transactions = [
+        ("credit", "100.00", "Alpha deposit", "2026-04-01T08:00:00+00:00"),
+        ("debit", "10.00", "Rent", "2026-04-02T12:00:00+00:00"),
+        ("credit", "20.00", "Alpha bonus", "2026-04-03T18:00:00+00:00"),
+    ]
+
+    for transaction_type, amount, description, occurred_at in transactions:
+        response = client.post(
+            f"/api/accounts/{account_id}/transactions",
+            json={
+                "type": transaction_type,
+                "amount": amount,
+                "description": description,
+                "reference_id": f"DATE-{uuid.uuid4()}",
+                "transaction_date": occurred_at,
+            },
+        )
+        assert response.status_code == 201
+
+    base_url = f"/api/transactions?account_id={account_id}"
+    no_date_filter = client.get(base_url).json()
+    assert no_date_filter["total_records"] == 3
+
+    from_only = client.get(f"{base_url}&start_date=2026-04-02").json()
+    assert from_only["total_records"] == 2
+
+    to_only = client.get(f"{base_url}&end_date=2026-04-02").json()
+    assert to_only["total_records"] == 2
+
+    same_day = client.get(
+        f"{base_url}&start_date=2026-04-02&end_date=2026-04-02"
+    ).json()
+    assert same_day["total_records"] == 1
+    assert same_day["transactions"][0]["description"] == "Rent"
+
+    combined_filters = client.get(
+        f"{base_url}&start_date=2026-04-01&end_date=2026-04-03"
+        "&search=alpha&type=credit&limit=1"
+    ).json()
+    assert combined_filters["total_records"] == 2
+    assert combined_filters["total_pages"] == 2
+    assert combined_filters["limit"] == 1
+    assert combined_filters["transactions"][0]["description"] == "Alpha bonus"
+
+    all_rows = no_date_filter["transactions"]
+    assert [row["created_at"] for row in all_rows] == sorted(
+        (row["created_at"] for row in all_rows), reverse=True
+    )

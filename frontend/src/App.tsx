@@ -71,9 +71,25 @@ function App() {
 
   const [historyType, setHistoryType] = useState<"" | "credit" | "debit">("");
   const [historyAccountId, setHistoryAccountId] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
+  const [debouncedHistorySearch, setDebouncedHistorySearch] = useState("");
+  const [historyStartDate, setHistoryStartDate] = useState("");
+  const [historyEndDate, setHistoryEndDate] = useState("");
 
   const [historyPage, setHistoryPage] = useState(1);
   const [historyLimit] = useState(5);
+  const invalidHistoryDateRange = Boolean(
+    historyStartDate && historyEndDate && historyStartDate > historyEndDate,
+  );
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setHistoryPage(1);
+      setDebouncedHistorySearch(historySearch.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [historySearch]);
   const [newAccount, setNewAccount] = useState<NewAccount>({
     name: "",
     account_type: "",
@@ -189,6 +205,7 @@ function App() {
 
   useEffect(() => {
     if (activeTab !== "History") return;
+    if (invalidHistoryDateRange) return;
 
     async function loadTransactionHistory() {
       setHistoryLoading(true);
@@ -200,6 +217,9 @@ function App() {
           historyLimit,
           historyAccountId || undefined,
           historyType || undefined,
+          debouncedHistorySearch || undefined,
+          historyStartDate || undefined,
+          historyEndDate || undefined,
         );
 
         setTransactionHistory(data);
@@ -215,7 +235,17 @@ function App() {
     }
 
     loadTransactionHistory();
-  }, [activeTab, historyAccountId, historyPage, historyLimit, historyType]);
+  }, [
+    activeTab,
+    historyAccountId,
+    historyPage,
+    historyLimit,
+    historyType,
+    debouncedHistorySearch,
+    historyStartDate,
+    historyEndDate,
+    invalidHistoryDateRange,
+  ]);
 
   async function handleCreateTransaction(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -894,6 +924,56 @@ function App() {
             </div>
 
             <div className="history-filters">
+              <div className="history-search-field">
+                <label htmlFor="history-search">Search transactions</label>
+                <input
+                  id="history-search"
+                  type="search"
+                  placeholder="Search description, reference ID, or account..."
+                  value={historySearch}
+                  onChange={(e) => {
+                    setHistorySearch(e.target.value);
+                  }}
+                />
+              </div>
+              <div>
+                <label htmlFor="history-start-date">From Date</label>
+                <input
+                  id="history-start-date"
+                  type="date"
+                  value={historyStartDate}
+                  max={historyEndDate || undefined}
+                  onChange={(e) => {
+                    setHistoryStartDate(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                />
+              </div>
+              <div>
+                <label htmlFor="history-end-date">To Date</label>
+                <input
+                  id="history-end-date"
+                  type="date"
+                  value={historyEndDate}
+                  min={historyStartDate || undefined}
+                  onChange={(e) => {
+                    setHistoryEndDate(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                />
+              </div>
+              <button
+                type="button"
+                className="secondary-button history-clear-dates"
+                disabled={!historyStartDate && !historyEndDate}
+                onClick={() => {
+                  setHistoryStartDate("");
+                  setHistoryEndDate("");
+                  setHistoryPage(1);
+                }}
+              >
+                Clear dates
+              </button>
               <div>
                 <label>Account</label>
                 <select
@@ -928,11 +1008,20 @@ function App() {
               </div>
             </div>
 
+            {invalidHistoryDateRange && (
+              <p className="error-message" role="alert">
+                From Date must be on or before To Date.
+              </p>
+            )}
+
             {historyLoading && <p className="muted">Loading transactions...</p>}
 
             {historyError && <p className="error-message">{historyError}</p>}
 
-            {!historyLoading && !historyError && transactionHistory && (
+            {!invalidHistoryDateRange &&
+              !historyLoading &&
+              !historyError &&
+              transactionHistory && (
               <>
                 <p className="muted">
                   Total records: {transactionHistory.total_records}
