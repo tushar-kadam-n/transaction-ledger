@@ -16,13 +16,17 @@ Request body:
 
 ```json
 {
-  "name": "Test Account"
+  "name": "Test Account",
+  "account_type": "savings",
+  "email": "test@example.com",
+  "phone": null,
+  "description": null
 }
 ```
 
-Successful response: `201 Created` (if configured by the application).
+`account_type` must be one of `savings`, `current`, `cash`, `digital_wallet`, or `business`. Provide at least one of `email` or `phone`; both and `description` are optional. Account names and text fields are trimmed, and the initial balance is always zero.
 
-The response contains the account ID, name, balance, and creation timestamp.
+The response contains account details, balance, and creation timestamp.
 
 Validation errors return `422 Unprocessable Entity`.
 
@@ -85,14 +89,15 @@ The transaction response includes transaction details, the resulting balance, an
 
 ## 4. Get Transaction History
 
-**Endpoint:** `GET /api/accounts/{account_id}/transactions`
+**Endpoint:** `GET /api/transactions`
 
-Returns transaction history in newest-first order.
+Returns all transactions in newest-first order. Use the optional `account_id` query parameter to filter to one account. The legacy endpoint `GET /api/accounts/{account_id}/transactions` remains available and retains its account-scoped response.
 
 Query parameters:
 
 | Parameter | Required | Default   | Description                     |
 | --------- | -------- | --------- | ------------------------------- |
+| `account_id` | No    | All accounts | Filter by account UUID          |
 | `type`    | No       | All types | Filter by `credit` or `debit`   |
 | `page`    | No       | `1`       | Page number, minimum `1`        |
 | `limit`   | No       | `10`      | Records per page, range `1–100` |
@@ -100,7 +105,7 @@ Query parameters:
 Example:
 
 ```http
-GET /api/accounts/ACCOUNT_UUID/transactions?type=debit&page=1&limit=10
+GET /api/transactions?account_id=ACCOUNT_UUID&type=debit&page=1&limit=10
 ```
 
 The response includes:
@@ -110,7 +115,7 @@ The response includes:
 - `limit`
 - `total_records`
 - `total_pages`
-- `transactions`
+- `transactions`, including `account_id`, `account_name`, type, amount, description, reference ID, and timestamp
 
 An invalid filter or pagination value returns `422 Unprocessable Entity`. A missing account returns `404 Not Found`.
 

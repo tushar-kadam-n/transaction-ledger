@@ -75,6 +75,12 @@ DATABASE_URL=postgresql+psycopg://YOUR_USERNAME:YOUR_PASSWORD@localhost:5432/tra
 
 Replace the placeholders with your local PostgreSQL credentials. Do not commit your `.env` file or real credentials to GitHub.
 
+Apply pending database migrations before starting the application:
+
+```bash
+alembic upgrade head
+```
+
 ### 5. Start the application
 
 From the project root, run:
@@ -96,10 +102,12 @@ The API should be available at:
 | POST   | `/api/accounts`                           | Create an account                    |
 | GET    | `/api/accounts/{account_id}/balance`      | Retrieve an account balance          |
 | POST   | `/api/accounts/{account_id}/transactions` | Create a credit or debit transaction |
-| GET    | `/api/accounts/{account_id}/transactions` | Retrieve transaction history         |
+| GET    | `/api/transactions`                       | Retrieve global or filtered history  |
+| GET    | `/api/accounts/{account_id}/transactions` | Legacy account-specific history       |
 
 ### Transaction History Query Parameters
 
+- `account_id`: Optional account UUID; omit to include all accounts.
 - `type`: Optional transaction type — `credit` or `debit`.
 - `page`: Page number; defaults to `1`.
 - `limit`: Number of records per page; defaults to `10`, maximum `100`.
@@ -107,10 +115,10 @@ The API should be available at:
 Example:
 
 ```http
-GET /api/accounts/{account_id}/transactions?type=credit&page=1&limit=10
+GET /api/transactions?type=credit&page=1&limit=10
 ```
 
-The response includes the account ID, current page, page size, total records, total pages, and transactions ordered newest first.
+The response includes each transaction's account ID and account name, current page, page size, total records, total pages, and transactions ordered newest first. Add `account_id` to filter to a single account. The account-specific route remains available for existing clients.
 
 ## Running Tests
 

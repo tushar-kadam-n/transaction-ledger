@@ -17,6 +17,7 @@ export type TransactionPayload = {
   amount: string;
   description: string;
   reference_id: string;
+  transaction_date: string;
 };
 
 export async function createTransaction(
@@ -49,9 +50,12 @@ export type Transaction = {
   type: "credit" | "debit";
   amount: string;
   description: string;
-  reference_id: string;
+  reference_id: string | null;
+  transaction_date: string;
   created_at: string;
 };
+
+export type TransactionHistoryItem = Transaction & { account_name: string };
 
 export type TransactionHistoryResponse = {
   account_id: string;
@@ -62,39 +66,75 @@ export type TransactionHistoryResponse = {
   transactions: Transaction[];
 };
 
+export type GlobalTransactionHistoryResponse = {
+  page: number;
+  limit: number;
+  total_records: number;
+  total_pages: number;
+  transactions: TransactionHistoryItem[];
+};
+
 export async function getTransactions(
   accountId: string,
   page = 1,
   limit = 10,
   type?: "credit" | "debit",
 ): Promise<TransactionHistoryResponse> {
+  const history = await getAllTransactions(page, limit, accountId, type);
+
+  return {
+    account_id: accountId,
+    ...history,
+  };
+}
+
+export async function getAllTransactions(
+  page = 1,
+  limit = 10,
+  accountId?: string,
+  type?: "credit" | "debit",
+): Promise<GlobalTransactionHistoryResponse> {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
   });
 
-  if (type) {
-    params.append("type", type);
+  if (accountId) params.append("account_id", accountId);
+  if (type) params.append("type", type);
+
+  const response = await fetch(`${API_BASE_URL}/transactions?${params}`, {
+    cache: "no-store",
+  });
+
+  const responseBody = await response.text();
+  let data: { detail?: string } | undefined;
+  try {
+    data = JSON.parse(responseBody) as { detail?: string };
+  } catch {
+    // Proxies and server errors can return plain text instead of JSON.
   }
-
-  const response = await fetch(
-    `${API_BASE_URL}/accounts/${accountId}/transactions?${params}`,
-    { cache: "no-store" },
-  );
-
-  const data = await response.json();
 
   if (!response.ok) {
     throw new Error(
-      data.detail || `Failed to fetch transactions: ${response.status}`,
+      data?.detail ||
+        responseBody ||
+        `Failed to fetch transactions: ${response.status}`,
     );
   }
 
-  return data;
+  if (!data) {
+    throw new Error("The server returned an invalid transaction history response.");
+  }
+
+  return data as GlobalTransactionHistoryResponse;
 }
 
 export type CreateAccountPayload = {
   name: string;
+  account_type: "savings" | "current" | "cash" | "digital_wallet" | "business";
+  email?: string;
+  phone?: string;
+  description?: string;
 };
 
 export async function createAccount(payload: CreateAccountPayload) {

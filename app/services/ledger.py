@@ -55,6 +55,7 @@ def add_transaction(
             amount=amount,
             description=payload.description,
             reference_id=payload.reference_id,
+            transaction_date=payload.transaction_date,
         )
 
         if payload.type == "credit":
