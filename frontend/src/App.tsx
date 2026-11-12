@@ -71,9 +71,20 @@ function App() {
 
   const [historyType, setHistoryType] = useState<"" | "credit" | "debit">("");
   const [historyAccountId, setHistoryAccountId] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
+  const [debouncedHistorySearch, setDebouncedHistorySearch] = useState("");
 
   const [historyPage, setHistoryPage] = useState(1);
   const [historyLimit] = useState(5);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setHistoryPage(1);
+      setDebouncedHistorySearch(historySearch.trim());
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [historySearch]);
   const [newAccount, setNewAccount] = useState<NewAccount>({
     name: "",
     account_type: "",
@@ -200,6 +211,7 @@ function App() {
           historyLimit,
           historyAccountId || undefined,
           historyType || undefined,
+          debouncedHistorySearch || undefined,
         );
 
         setTransactionHistory(data);
@@ -215,7 +227,14 @@ function App() {
     }
 
     loadTransactionHistory();
-  }, [activeTab, historyAccountId, historyPage, historyLimit, historyType]);
+  }, [
+    activeTab,
+    historyAccountId,
+    historyPage,
+    historyLimit,
+    historyType,
+    debouncedHistorySearch,
+  ]);
 
   async function handleCreateTransaction(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -894,6 +913,18 @@ function App() {
             </div>
 
             <div className="history-filters">
+              <div className="history-search-field">
+                <label htmlFor="history-search">Search transactions</label>
+                <input
+                  id="history-search"
+                  type="search"
+                  placeholder="Search description, reference ID, or account..."
+                  value={historySearch}
+                  onChange={(e) => {
+                    setHistorySearch(e.target.value);
+                  }}
+                />
+              </div>
               <div>
                 <label>Account</label>
                 <select

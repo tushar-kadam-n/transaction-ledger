@@ -3,7 +3,7 @@ from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -66,6 +66,7 @@ def _query_transaction_history(
     type: Literal["credit", "debit"] | None,
     page: int = 1,
     limit: int = 10,
+    search: str | None = None,
 ):
     if account_id is not None and db.get(Account, account_id) is None:
         raise HTTPException(
@@ -76,7 +77,9 @@ def _query_transaction_history(
     statement = select(Transaction, Account.name).join(
         Account, Transaction.account_id == Account.id
     )
-    count_statement = select(func.count()).select_from(Transaction)
+    count_statement = select(func.count()).select_from(Transaction).join(
+        Account, Transaction.account_id == Account.id
+    )
 
     if account_id is not None:
         statement = statement.where(Transaction.account_id == account_id)
@@ -87,6 +90,16 @@ def _query_transaction_history(
     if type is not None:
         statement = statement.where(Transaction.type == type)
         count_statement = count_statement.where(Transaction.type == type)
+
+    if search:
+        search_pattern = f"%{search}%"
+        search_filter = or_(
+            Transaction.description.ilike(search_pattern),
+            Transaction.reference_id.ilike(search_pattern),
+            Account.name.ilike(search_pattern),
+        )
+        statement = statement.where(search_filter)
+        count_statement = count_statement.where(search_filter)
 
     total_records = db.execute(count_statement).scalar_one()
     rows = db.execute(
@@ -109,11 +122,14 @@ def _query_transaction_history(
 def get_all_transaction_history(
     account_id: UUID | None = Query(default=None),
     type: Literal["credit", "debit"] | None = Query(default=None),
+    search: str | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    history = _query_transaction_history(db, account_id, type, page, limit)
+    history = _query_transaction_history(
+        db, account_id, type, page, limit, search
+    )
 
     return {
         "page": history["page"],

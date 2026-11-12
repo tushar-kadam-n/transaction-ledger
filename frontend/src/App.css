@@ -801,6 +801,26 @@ h2 {
   gap: 8px;
 }
 
+.history-filters>.history-search-field {
+  flex-basis: 100%;
+}
+
+.history-search-field input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+}
+
+.history-search-field input:focus {
+  outline: 2px solid #8ed9ba;
+  outline-offset: 1px;
+}
+
 .history-content>.muted {
   color: #536477;
 }
