@@ -15,6 +15,8 @@ import {
   TRANSACTION_DISPLAY_LOCALE,
   TRANSACTION_TYPE_OPTIONS,
 } from "./constants/transaction";
+import { Sidebar } from "./components/layout/Sidebar";
+import { TopBar } from "./components/layout/TopBar";
 import type {
   Account,
   AccountFormErrors,
@@ -420,44 +422,10 @@ function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-icon">T</div>
-          <span>Transaction Ledger</span>
-        </div>
-
-        <p className="nav-label">WORKSPACE</p>
-
-        <nav>
-          {NAVIGATION_TABS.map((tab) => (
-            <button
-              key={tab}
-              className={`nav-item ${activeTab === tab ? "active" : ""}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
-
-        <div className="sidebar-footer">
-          <span className="status-dot" />
-          API dashboard
-          <span className="version">v1.0</span>
-        </div>
-      </aside>
+      <Sidebar activeTab={activeTab} onNavigate={setActiveTab} />
 
       <main className="main">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">FINANCIAL MANAGEMENT</p>
-            <h1>{activeTab}</h1>
-          </div>
-          <div className="profile">
-            <div className="avatar">TL</div>
-            <span>Ledger Workspace</span>
-          </div>
-        </header>
+        <TopBar pageTitle={activeTab} />
 
         {activeTab === "Overview" && (
           <section>
