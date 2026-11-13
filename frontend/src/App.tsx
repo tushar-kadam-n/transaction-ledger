@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   getAccounts,
-  createAccount,
   createTransaction,
   getAllTransactions,
 } from "./api";
@@ -18,8 +17,9 @@ import { AccountForm } from "./components/accounts/AccountForm";
 import { TransactionForm } from "./components/transactions/TransactionForm";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { OverviewPage } from "./features/overview/OverviewPage";
+import { useAccountCreation } from "./hooks/useAccountCreation";
 import { useTransactionHistory } from "./hooks/useTransactionHistory";
-import type { Account, AccountFormErrors, NewAccount } from "./types/account";
+import type { Account } from "./types/account";
 import type {
   TransactionHistoryItem,
   TransactionType,
@@ -39,6 +39,13 @@ function App() {
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [accountsError, setAccountsError] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("");
+  const accountCreation = useAccountCreation({
+    refreshAccounts: async () => {
+      const updatedAccounts = await getAccounts();
+      setAccounts(updatedAccounts);
+    },
+    selectAccount: setSelectedAccountId,
+  });
   const [transactionType, setTransactionType] =
     useState<TransactionType>("credit");
   const [amount, setAmount] = useState("");
@@ -49,19 +56,6 @@ function App() {
   const [submitting, setSubmitting] = useState(false);
   const [transactionMessage, setTransactionMessage] = useState("");
   const [transactionError, setTransactionError] = useState("");
-  const [newAccount, setNewAccount] = useState<NewAccount>({
-    name: "",
-    account_type: "",
-    email: "",
-    phone: "",
-    description: "",
-  });
-  const [accountFormErrors, setAccountFormErrors] = useState<AccountFormErrors>(
-    {},
-  );
-  const [creatingAccount, setCreatingAccount] = useState(false);
-  const [accountCreateMessage, setAccountCreateMessage] = useState("");
-  const [accountCreateError, setAccountCreateError] = useState("");
   const [totalTransactions, setTotalTransactions] = useState(0);
   const [recentTransactions, setRecentTransactions] = useState<
     TransactionHistoryItem[]
@@ -240,82 +234,6 @@ function App() {
     }
   }
 
-  async function handleCreateAccount(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    setAccountCreateMessage("");
-    setAccountCreateError("");
-
-    const name = newAccount.name.trim();
-    const accountType = newAccount.account_type;
-    const email = newAccount.email.trim();
-    const phone = newAccount.phone.trim();
-    const description = newAccount.description.trim();
-    const errors: AccountFormErrors = {};
-
-    if (!name) errors.name = "Enter an account name.";
-    if (!accountType) errors.account_type = "Select an account type.";
-
-    if (!email && !phone) {
-      errors.email = "Provide an email address or phone number.";
-      errors.phone = "Provide an email address or phone number.";
-    } else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-      errors.email = "Enter a valid email address.";
-    }
-
-    if (phone) {
-      const digitCount = phone.replace(/\D/g, "").length;
-      if (
-        !/^\+?[0-9][0-9\s().-]*$/.test(phone) ||
-        digitCount < 7 ||
-        digitCount > 15
-      ) {
-        errors.phone = "Enter a valid phone number.";
-      }
-    }
-
-    setAccountFormErrors(errors);
-    if (Object.keys(errors).length > 0 || !accountType) return;
-
-    setCreatingAccount(true);
-
-    try {
-      const result = await createAccount({
-        name,
-        account_type: accountType,
-        email: email || undefined,
-        phone: phone || undefined,
-        description: description || undefined,
-      });
-
-      const updatedAccounts = await getAccounts();
-      setAccounts(updatedAccounts);
-
-      setSelectedAccountId(result.id);
-
-      setAccountCreateMessage("Account created successfully!");
-      setNewAccount({
-        name: "",
-        account_type: "",
-        email: "",
-        phone: "",
-        description: "",
-      });
-      setAccountFormErrors({});
-    } catch (error) {
-      setAccountCreateError(
-        error instanceof Error ? error.message : "Unable to create account.",
-      );
-    } finally {
-      setCreatingAccount(false);
-    }
-  }
-
-  function handleAccountFormValuesChange(values: NewAccount) {
-    setNewAccount(values);
-    setAccountFormErrors({});
-  }
-
   return (
     <div className="app">
       <Sidebar activeTab={activeTab} onNavigate={setActiveTab} />
@@ -342,13 +260,13 @@ function App() {
         {activeTab === "Accounts" && (
           <>
             <AccountForm
-              values={newAccount}
-              errors={accountFormErrors}
-              isSubmitting={creatingAccount}
-              successMessage={accountCreateMessage}
-              errorMessage={accountCreateError}
-              onValuesChange={handleAccountFormValuesChange}
-              onSubmit={handleCreateAccount}
+              values={accountCreation.newAccount}
+              errors={accountCreation.accountFormErrors}
+              isSubmitting={accountCreation.creatingAccount}
+              successMessage={accountCreation.accountCreateMessage}
+              errorMessage={accountCreation.accountCreateError}
+              onValuesChange={accountCreation.onValuesChange}
+              onSubmit={accountCreation.onSubmit}
             />
             <section className="content-card accounts-content">
               <div>
