@@ -5,7 +5,7 @@ from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
-from app.database import Base
+from app.database import Base, normalize_database_url
 from app.models.account import Account  # noqa: F401
 from app.models.transaction import Transaction  # noqa: F401
 
@@ -17,6 +17,7 @@ load_dotenv()
 database_url = os.getenv("ALEMBIC_DATABASE_URL") or os.getenv("DATABASE_URL")
 if not database_url:
     raise RuntimeError("DATABASE_URL is missing from .env")
+database_url = normalize_database_url(database_url)
 config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 target_metadata = Base.metadata
