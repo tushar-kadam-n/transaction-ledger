@@ -1,12 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import {
-  getAccounts,
-  getAllTransactions,
-} from "./api";
+import { useEffect, useState } from "react";
+import { getAccounts } from "./api";
 import { NAVIGATION_TABS, type NavigationTab } from "./constants/navigation";
 import {
   CURRENCY_SYMBOL,
-  OVERVIEW_RECENT_TRANSACTION_LIMIT,
   TRANSACTION_DISPLAY_LOCALE,
 } from "./constants/transaction";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -17,15 +13,16 @@ import { TransactionForm } from "./components/transactions/TransactionForm";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { OverviewPage } from "./features/overview/OverviewPage";
 import { useAccountCreation } from "./hooks/useAccountCreation";
+import { useOverviewData } from "./hooks/useOverviewData";
 import { useTransactionCreation } from "./hooks/useTransactionCreation";
 import { useTransactionHistory } from "./hooks/useTransactionHistory";
 import type { Account } from "./types/account";
-import type { TransactionHistoryItem } from "./types/transaction";
 import "./App.css";
 
 function App() {
   const [activeTab, setActiveTab] = useState<NavigationTab>(NAVIGATION_TABS[0]);
   const history = useTransactionHistory(activeTab === "History");
+  const overview = useOverviewData(activeTab);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [accountsError, setAccountsError] = useState("");
@@ -45,18 +42,6 @@ function App() {
       setAccounts(updatedAccounts);
     },
   });
-  const [totalTransactions, setTotalTransactions] = useState(0);
-  const [recentTransactions, setRecentTransactions] = useState<
-    TransactionHistoryItem[]
-  >([]);
-  const lastOverviewRequestTab = useRef<NavigationTab | null>(null);
-  const totalAccounts = accounts.length;
-
-  const totalBalance = accounts.reduce(
-    (total, account) => total + Number(account.balance),
-    0,
-  );
-
   useEffect(() => {
     async function loadAccounts() {
       setLoadingAccounts(true);
@@ -80,31 +65,6 @@ function App() {
     loadAccounts();
   }, []);
 
-  useEffect(() => {
-    if (activeTab !== "Overview") {
-      lastOverviewRequestTab.current = activeTab;
-      return;
-    }
-
-    if (lastOverviewRequestTab.current === "Overview") return;
-    lastOverviewRequestTab.current = "Overview";
-
-    async function loadOverviewTransactions() {
-      try {
-        const result = await getAllTransactions(
-          1,
-          OVERVIEW_RECENT_TRANSACTION_LIMIT,
-        );
-        setRecentTransactions(result.transactions);
-        setTotalTransactions(result.total_records);
-      } catch (error) {
-        console.error("Failed to load overview transactions:", error);
-      }
-    }
-
-    loadOverviewTransactions();
-  }, [activeTab]);
-
   return (
     <div className="app">
       <Sidebar activeTab={activeTab} onNavigate={setActiveTab} />
@@ -115,10 +75,8 @@ function App() {
         {activeTab === "Overview" && (
           <OverviewPage
             accounts={accounts}
-            totalAccounts={totalAccounts}
-            totalBalance={totalBalance}
-            totalTransactions={totalTransactions}
-            recentTransactions={recentTransactions}
+            totalTransactions={overview.totalTransactions}
+            recentTransactions={overview.recentTransactions}
             loadingAccounts={loadingAccounts}
             accountsError={accountsError}
             currencySymbol={CURRENCY_SYMBOL}

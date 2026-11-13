@@ -4,23 +4,19 @@ import type { Account } from "../../types/account";
 import type { TransactionHistoryItem } from "../../types/transaction";
 
 interface OverviewPageProps {
-  accounts: Account[];
-  totalAccounts: number;
-  totalBalance: number;
-  totalTransactions: number;
-  recentTransactions: TransactionHistoryItem[];
-  loadingAccounts: boolean;
-  accountsError: string;
-  currencySymbol: string;
-  displayLocale: string;
-  onManageAccounts: () => void;
-  onViewHistory: () => void;
+  readonly accounts: Account[];
+  readonly totalTransactions: number;
+  readonly recentTransactions: TransactionHistoryItem[];
+  readonly loadingAccounts: boolean;
+  readonly accountsError: string;
+  readonly currencySymbol: string;
+  readonly displayLocale: string;
+  readonly onManageAccounts: () => void;
+  readonly onViewHistory: () => void;
 }
 
 export function OverviewPage({
   accounts,
-  totalAccounts,
-  totalBalance,
   totalTransactions,
   recentTransactions,
   loadingAccounts,
@@ -30,15 +26,19 @@ export function OverviewPage({
   onManageAccounts,
   onViewHistory,
 }: OverviewPageProps) {
+  const totalAccounts = accounts.length;
+  const totalBalance = accounts.reduce(
+    (total, account) => total + Number(account.balance),
+    0,
+  );
+
   return (
     <section>
       <div className="welcome">
         <div>
           <p className="eyebrow">ACCOUNT CENTER</p>
           <h2>Manage your money with clarity.</h2>
-          <p>
-            Track account balances and financial transactions in one place.
-          </p>
+          <p>Track account balances and financial transactions in one place.</p>
         </div>
         <div className="welcome-mark">{currencySymbol}</div>
       </div>
