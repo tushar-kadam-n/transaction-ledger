@@ -8,7 +8,7 @@ import type {
   TransactionType,
 } from "./types/transaction";
 
-const API_BASE_URL = "/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export async function getAccounts(): Promise<Account[]> {
   const response = await fetch(`${API_BASE_URL}/accounts`, {
@@ -101,7 +101,9 @@ export async function getAllTransactions(
   }
 
   if (!data) {
-    throw new Error("The server returned an invalid transaction history response.");
+    throw new Error(
+      "The server returned an invalid transaction history response.",
+    );
   }
 
   return data as GlobalTransactionHistoryResponse;
@@ -131,7 +133,9 @@ export async function exportTransactionsCsv(
       // Keep plain-text API errors readable too.
     }
     throw new Error(
-      detail || responseBody || `Failed to export transactions: ${response.status}`,
+      detail ||
+        responseBody ||
+        `Failed to export transactions: ${response.status}`,
     );
   }
 
