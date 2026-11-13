@@ -1,4 +1,5 @@
 
+import logging
 import os
 
 from fastapi import FastAPI
@@ -16,16 +17,21 @@ app = FastAPI(
     version="1.0.0",
 )
 
+logger = logging.getLogger(__name__)
+raw_frontend_origins = os.getenv("FRONTEND_ORIGINS")
+logger.info("FRONTEND_ORIGINS raw value: %r", raw_frontend_origins)
+
 allowed_origins = [
     origin
     for origin in (
         value.strip()
-        for value in os.getenv("FRONTEND_ORIGINS", "").split(",")
+        for value in (raw_frontend_origins or "").split(",")
     )
     if origin and "*" not in origin
 ]
 if not allowed_origins:
     allowed_origins = ["http://localhost:5173"]
+logger.info("CORS allowed origins: %s", allowed_origins)
 
 app.add_middleware(
     CORSMiddleware,
