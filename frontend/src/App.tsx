@@ -4,12 +4,10 @@ import {
   createAccount,
   createTransaction,
   getAllTransactions,
-  exportTransactionsCsv,
 } from "./api";
 import { NAVIGATION_TABS, type NavigationTab } from "./constants/navigation";
 import {
   CURRENCY_SYMBOL,
-  HISTORY_PAGE_SIZE,
   OVERVIEW_RECENT_TRANSACTION_LIMIT,
   TRANSACTION_DISPLAY_LOCALE,
 } from "./constants/transaction";
@@ -20,9 +18,9 @@ import { AccountForm } from "./components/accounts/AccountForm";
 import { TransactionForm } from "./components/transactions/TransactionForm";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { OverviewPage } from "./features/overview/OverviewPage";
+import { useTransactionHistory } from "./hooks/useTransactionHistory";
 import type { Account, AccountFormErrors, NewAccount } from "./types/account";
 import type {
-  GlobalTransactionHistoryResponse,
   TransactionHistoryItem,
   TransactionType,
 } from "./types/transaction";
@@ -36,6 +34,7 @@ function currentLocalDateTime() {
 
 function App() {
   const [activeTab, setActiveTab] = useState<NavigationTab>(NAVIGATION_TABS[0]);
+  const history = useTransactionHistory(activeTab === "History");
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [accountsError, setAccountsError] = useState("");
@@ -50,36 +49,6 @@ function App() {
   const [submitting, setSubmitting] = useState(false);
   const [transactionMessage, setTransactionMessage] = useState("");
   const [transactionError, setTransactionError] = useState("");
-  const [transactionHistory, setTransactionHistory] =
-    useState<GlobalTransactionHistoryResponse | null>(null);
-
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState("");
-  const [historyExporting, setHistoryExporting] = useState(false);
-  const [historyExportError, setHistoryExportError] = useState("");
-  const [historyExportMessage, setHistoryExportMessage] = useState("");
-
-  const [historyType, setHistoryType] = useState<"" | TransactionType>("");
-  const [historyAccountId, setHistoryAccountId] = useState("");
-  const [historySearch, setHistorySearch] = useState("");
-  const [debouncedHistorySearch, setDebouncedHistorySearch] = useState("");
-  const [historyStartDate, setHistoryStartDate] = useState("");
-  const [historyEndDate, setHistoryEndDate] = useState("");
-
-  const [historyPage, setHistoryPage] = useState(1);
-  const historyLimit = HISTORY_PAGE_SIZE;
-  const invalidHistoryDateRange = Boolean(
-    historyStartDate && historyEndDate && historyStartDate > historyEndDate,
-  );
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setHistoryPage(1);
-      setDebouncedHistorySearch(historySearch.trim());
-    }, 300);
-
-    return () => window.clearTimeout(timeout);
-  }, [historySearch]);
   const [newAccount, setNewAccount] = useState<NewAccount>({
     name: "",
     account_type: "",
@@ -196,50 +165,6 @@ function App() {
     loadOverviewTransactions();
   }, [activeTab]);
 
-  useEffect(() => {
-    if (activeTab !== "History") return;
-    if (invalidHistoryDateRange) return;
-
-    async function loadTransactionHistory() {
-      setHistoryLoading(true);
-      setHistoryError("");
-
-      try {
-        const data = await getAllTransactions(
-          historyPage,
-          historyLimit,
-          historyAccountId || undefined,
-          historyType || undefined,
-          debouncedHistorySearch || undefined,
-          historyStartDate || undefined,
-          historyEndDate || undefined,
-        );
-
-        setTransactionHistory(data);
-      } catch (error) {
-        setHistoryError(
-          error instanceof Error
-            ? error?.message
-            : "Unable to load transaction history.",
-        );
-      } finally {
-        setHistoryLoading(false);
-      }
-    }
-
-    loadTransactionHistory();
-  }, [
-    activeTab,
-    historyAccountId,
-    historyPage,
-    historyLimit,
-    historyType,
-    debouncedHistorySearch,
-    historyStartDate,
-    historyEndDate,
-    invalidHistoryDateRange,
-  ]);
-
   async function handleCreateTransaction(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
@@ -312,39 +237,6 @@ function App() {
       );
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function handleExportTransactions() {
-    setHistoryExportError("");
-    setHistoryExportMessage("");
-    setHistoryExporting(true);
-
-    try {
-      const csv = await exportTransactionsCsv({
-        accountId: historyAccountId || undefined,
-        type: historyType || undefined,
-        search: debouncedHistorySearch || undefined,
-        startDate: historyStartDate || undefined,
-        endDate: historyEndDate || undefined,
-      });
-      const downloadUrl = URL.createObjectURL(csv);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = "transactions.csv";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
-      setHistoryExportMessage("CSV export downloaded.");
-    } catch (error) {
-      setHistoryExportError(
-        error instanceof Error
-          ? error.message
-          : "Unable to export transactions.",
-      );
-    } finally {
-      setHistoryExporting(false);
     }
   }
 
@@ -531,44 +423,7 @@ function App() {
         {activeTab === "History" && (
           <HistoryPage
             accounts={accounts}
-            transactionHistory={transactionHistory}
-            historyPage={historyPage}
-            historyAccountId={historyAccountId}
-            historyType={historyType}
-            historySearch={historySearch}
-            historyStartDate={historyStartDate}
-            historyEndDate={historyEndDate}
-            invalidHistoryDateRange={invalidHistoryDateRange}
-            historyLoading={historyLoading}
-            historyError={historyError}
-            historyExporting={historyExporting}
-            historyExportError={historyExportError}
-            historyExportMessage={historyExportMessage}
-            onAccountChange={(accountId) => {
-              setHistoryAccountId(accountId);
-              setHistoryPage(1);
-            }}
-            onTypeChange={(type) => {
-              setHistoryType(type);
-              setHistoryPage(1);
-            }}
-            onSearchChange={setHistorySearch}
-            onStartDateChange={(date) => {
-              setHistoryStartDate(date);
-              setHistoryPage(1);
-            }}
-            onEndDateChange={(date) => {
-              setHistoryEndDate(date);
-              setHistoryPage(1);
-            }}
-            onClearDates={() => {
-              setHistoryStartDate("");
-              setHistoryEndDate("");
-              setHistoryPage(1);
-            }}
-            onExport={handleExportTransactions}
-            onPreviousPage={() => setHistoryPage((page) => page - 1)}
-            onNextPage={() => setHistoryPage((page) => page + 1)}
+            {...history}
           />
         )}
       </main>
