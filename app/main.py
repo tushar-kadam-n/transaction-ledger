@@ -1,5 +1,8 @@
 
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.database import engine
@@ -11,6 +14,24 @@ app = FastAPI(
     title="Transaction Ledger API",
     description="Manage accounts, credits, debits, and transaction history.",
     version="1.0.0",
+)
+
+allowed_origins = [
+    origin
+    for origin in (
+        value.strip()
+        for value in os.getenv("FRONTEND_ORIGINS", "").split(",")
+    )
+    if origin and "*" not in origin
+]
+if not allowed_origins:
+    allowed_origins = ["http://localhost:5173"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 app.include_router(accounts_router)
