@@ -27,20 +27,20 @@ function App() {
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [accountsError, setAccountsError] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("");
+
+  async function refreshAccounts() {
+    const updatedAccounts = await getAccounts();
+    setAccounts(updatedAccounts);
+  }
+
   const accountCreation = useAccountCreation({
-    refreshAccounts: async () => {
-      const updatedAccounts = await getAccounts();
-      setAccounts(updatedAccounts);
-    },
+    refreshAccounts,
     selectAccount: setSelectedAccountId,
   });
   const transactionCreation = useTransactionCreation({
     accounts,
     selectedAccountId,
-    refreshAccounts: async () => {
-      const updatedAccounts = await getAccounts();
-      setAccounts(updatedAccounts);
-    },
+    refreshAccounts,
   });
   useEffect(() => {
     async function loadAccounts() {
