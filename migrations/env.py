@@ -7,7 +7,10 @@ from sqlalchemy import engine_from_config, pool
 
 from app.database import Base, normalize_database_url
 from app.models.account import Account  # noqa: F401
+from app.models.auth_token import AuthToken  # noqa: F401
+from app.models.refresh_session import RefreshSession  # noqa: F401
 from app.models.transaction import Transaction  # noqa: F401
+from app.models.user import User  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

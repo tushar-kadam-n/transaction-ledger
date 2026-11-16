@@ -138,3 +138,48 @@ Exact status codes and response bodies depend on the application's implemented e
 - Account balance changes and transaction creation are handled together.
 - Database constraints enforce valid transaction types and positive amounts.
 - The API does not provide transaction update or deletion endpoints.
+## Authentication: Register
+
+**Endpoint:** `POST /api/auth/register`
+
+Request body:
+
+```json
+{
+  "email": "person@example.com",
+  "password": "at-least-eight-characters",
+  "confirm_password": "at-least-eight-characters"
+}
+```
+
+Email is trimmed and normalized to lowercase. Passwords must be at least eight
+characters and the confirmation must match. A successful request creates an
+unverified user, stores only an Argon2 password hash and a SHA-256 hash of a
+24-hour verification token, then sends a verification link. The raw token is
+only included in the email.
+
+The link uses `FRONTEND_URL` as its base, for example
+`http://localhost:5173/verify-email?token=...` during local development. Set
+`FRONTEND_URL`, `RESEND_API_KEY`, and `EMAIL_FROM` in the environment. Missing
+email configuration or delivery failure returns `503` and rolls back the
+pending user and token.
+
+Responses: `201 Created` on success, `409 Conflict` for a registered email,
+`422 Unprocessable Entity` for invalid input, and `503 Service Unavailable`
+when email delivery is unavailable.
+
+## Authentication: Verify email
+
+**Endpoint:** `POST /api/auth/verify-email`
+
+Request body:
+
+```json
+{
+  "token": "raw-token-from-verification-email"
+}
+```
+
+A valid, unexpired, unused email-verification token marks the user verified
+and is consumed atomically. Invalid, expired, used, or wrong-purpose tokens
+return `400 Bad Request`. The token is never returned by the API.

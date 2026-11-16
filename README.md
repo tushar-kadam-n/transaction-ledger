@@ -71,9 +71,16 @@ Create a `.env` file in the project root and configure your database connection:
 
 ```env
 DATABASE_URL=postgresql+psycopg://YOUR_USERNAME:YOUR_PASSWORD@localhost:5432/transaction_ledger
+FRONTEND_URL=http://localhost:5173
+RESEND_API_KEY=your-resend-api-key
+EMAIL_FROM=your-verified-sender@example.com
 ```
 
 Replace the placeholders with your local PostgreSQL credentials. Do not commit your `.env` file or real credentials to GitHub.
+For local email verification links, set `FRONTEND_URL` to your frontend origin
+(`http://localhost:5173` for the Vite dev server). Configure `RESEND_API_KEY`
+and `EMAIL_FROM` with values from your Resend account; production deployments
+must set their own frontend origin and sender configuration.
 
 Apply pending database migrations before starting the application:
 
