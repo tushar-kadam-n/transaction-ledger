@@ -26,6 +26,11 @@ def transaction_date():
 
 def test_create_account(client):
     account_id = create_account(client)
+    created_account = next(
+        account for account in client.get("/api/accounts").json()
+        if account["id"] == account_id
+    )
+    assert created_account["created_at"].endswith("+00:00")
 
     response = client.get(
         f"/api/accounts/{account_id}/balance"
@@ -70,7 +75,7 @@ def test_credit_and_debit(client):
 def test_transaction_dates_are_stored_and_returned_in_history(client):
     account_id = create_account(client)
     current_date = transaction_date()
-    past_date = "2020-01-02T03:04:05+00:00"
+    past_date = "2020-01-02T08:34:05+05:30"
 
     current = client.post(
         f"/api/accounts/{account_id}/transactions",
@@ -94,6 +99,11 @@ def test_transaction_dates_are_stored_and_returned_in_history(client):
     )
 
     assert current.status_code == past.status_code == 201
+    assert current.json()["transaction"]["transaction_date"].endswith("+00:00")
+    assert current.json()["transaction"]["created_at"].endswith("+00:00")
+    assert past.json()["transaction"]["transaction_date"] == (
+        "2020-01-02T03:04:05+00:00"
+    )
     assert datetime.fromisoformat(
         current.json()["transaction"]["transaction_date"]
     ) == datetime.fromisoformat(current_date)
@@ -109,9 +119,29 @@ def test_transaction_dates_are_stored_and_returned_in_history(client):
     assert datetime.fromisoformat(
         history_by_description["Past transaction"]["transaction_date"]
     ) == datetime.fromisoformat(past_date)
+    assert history_by_description["Past transaction"]["transaction_date"] == (
+        "2020-01-02T03:04:05+00:00"
+    )
     assert float(
         client.get(f"/api/accounts/{account_id}/balance").json()["balance"]
     ) == 45.0
+
+
+def test_transaction_date_requires_timezone(client):
+    account_id = create_account(client)
+    response = client.post(
+        f"/api/accounts/{account_id}/transactions",
+        json={
+            "type": "credit",
+            "amount": "1.00",
+            "description": "Timezone validation",
+            "reference_id": f"TIMEZONE-{uuid.uuid4()}",
+            "transaction_date": "2026-05-14T09:30:00",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "Timestamp must include a timezone." in response.text
 
 
 def test_insufficient_balance(client):
@@ -482,7 +512,7 @@ def test_transaction_history_date_range_filters_and_counts(client):
 def test_transaction_history_csv_export_filters_and_all_matching_rows(client):
     account_a = create_account(client, "CSV Account A")
     account_b = create_account(client, "CSV Account B")
-    date_value = "2026-05-14T09:30:00+00:00"
+    date_value = "2026-05-14T15:00:00+05:30"
     exported_description = '=SUM(1,2), spreadsheet test\ncontinued'
 
     for index in range(6):

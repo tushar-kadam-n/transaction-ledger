@@ -74,6 +74,15 @@ DATABASE_URL=postgresql+psycopg://YOUR_USERNAME:YOUR_PASSWORD@localhost:5432/tra
 FRONTEND_URL=http://localhost:5173
 RESEND_API_KEY=your-resend-api-key
 EMAIL_FROM=your-verified-sender@example.com
+JWT_SECRET_KEY=generate-a-local-random-secret-of-at-least-32-characters
+# Optional cookie/CSRF settings; these defaults are suitable for localhost.
+REFRESH_COOKIE_NAME=refresh_token
+CSRF_COOKIE_NAME=csrf_token
+CSRF_HEADER_NAME=X-CSRF-Token
+COOKIE_SECURE=false
+COOKIE_SAMESITE=lax
+COOKIE_PATH=/api/auth
+REFRESH_TOKEN_LIFETIME_SECONDS=604800
 ```
 
 Replace the placeholders with your local PostgreSQL credentials. Do not commit your `.env` file or real credentials to GitHub.
@@ -81,6 +90,14 @@ For local email verification links, set `FRONTEND_URL` to your frontend origin
 (`http://localhost:5173` for the Vite dev server). Configure `RESEND_API_KEY`
 and `EMAIL_FROM` with values from your Resend account; production deployments
 must set their own frontend origin and sender configuration.
+Generate a local JWT signing secret with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+Keep it private and configure it separately in each environment.
+
+Authentication cookie settings are optional in local development. The refresh
+cookie is HttpOnly and the CSRF cookie is readable by the frontend. In a
+production HTTPS deployment set `COOKIE_SECURE=true`; `COOKIE_SAMESITE` may be
+`strict`, `lax`, or `none` (`none` requires secure cookies). `COOKIE_DOMAIN` is
+optional. Cookie settings must be kept consistent when clearing cookies.
 
 Apply pending database migrations before starting the application:
 
@@ -106,6 +123,9 @@ The API should be available at:
 
 | Method | Endpoint                                  | Description                          |
 | ------ | ----------------------------------------- | ------------------------------------ |
+| POST   | `/api/auth/login`                         | Authenticate and set auth cookies    |
+| POST   | `/api/auth/refresh`                       | Rotate refresh token and issue access token |
+| POST   | `/api/auth/logout`                        | Revoke session and clear auth cookies |
 | POST   | `/api/accounts`                           | Create an account                    |
 | GET    | `/api/accounts/{account_id}/balance`      | Retrieve an account balance          |
 | POST   | `/api/accounts/{account_id}/transactions` | Create a credit or debit transaction |

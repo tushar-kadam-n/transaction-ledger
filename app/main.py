@@ -24,6 +24,7 @@ app = FastAPI(
 logger = logging.getLogger(__name__)
 raw_frontend_origins = os.getenv("FRONTEND_ORIGINS")
 logger.info("FRONTEND_ORIGINS raw value: %r", raw_frontend_origins)
+csrf_header_name = os.getenv("CSRF_HEADER_NAME", "X-CSRF-Token").strip()
 
 allowed_origins = [
     origin
@@ -41,7 +42,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", csrf_header_name],
 )
 
 

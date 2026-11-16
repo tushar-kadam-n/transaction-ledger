@@ -5,7 +5,16 @@ from decimal import Decimal
 import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
+
+from app.time_utils import to_utc
 
 
 AccountType = Literal["savings", "current", "cash", "digital_wallet", "business"]
@@ -69,3 +78,7 @@ class AccountResponse(BaseModel):
     description: str | None
     balance: Decimal
     created_at: datetime
+
+    @field_serializer("created_at")
+    def serialize_created_at_as_utc(self, value: datetime) -> str:
+        return to_utc(value).isoformat()

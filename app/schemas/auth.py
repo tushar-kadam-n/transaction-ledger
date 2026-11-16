@@ -44,3 +44,22 @@ class RegistrationRequest(BaseModel):
 
 class VerifyEmailRequest(BaseModel):
     token: SecretStr = Field(min_length=1, max_length=512)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    password: SecretStr = Field(min_length=1, max_length=1024)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
+            raise ValueError("Enter a valid email address.")
+        return value

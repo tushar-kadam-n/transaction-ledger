@@ -6,12 +6,14 @@ from urllib.parse import parse_qs, urlsplit
 from unittest.mock import AsyncMock
 
 import pytest
+import jwt
 from argon2 import PasswordHasher
 from sqlalchemy import select
 
 from app.models.auth_token import AuthToken
 from app.models.user import User
 from app.routes import auth as auth_routes
+from app.services import authentication as auth_service
 from app.services.email import EmailDeliveryError
 from tests.conftest import TestingSessionLocal
 
@@ -46,6 +48,122 @@ def _verification_token(mock_send_email):
 
 def _user_by_email(db, email):
     return db.scalar(select(User).where(User.email == email))
+
+
+def _create_login_user(email, password, is_verified=True):
+    with TestingSessionLocal() as db:
+        user = User(
+            email=email,
+            password_hash=auth_service.hash_password(password),
+            is_verified=is_verified,
+        )
+        db.add(user)
+        db.commit()
+        return user.id
+
+
+def test_login_returns_signed_access_token_for_verified_user(
+    client, monkeypatch, tracked_emails
+):
+    email_address = "login@example.com"
+    password = "correct-horse-7"
+    tracked_emails.add(email_address)
+    user_id = _create_login_user(email_address, password)
+    monkeypatch.setenv("JWT_SECRET_KEY", "local-test-signing-secret-at-least-32-bytes")
+
+    response = client.post(
+        "/api/auth/login",
+        json={"email": "  LOGIN@Example.com ", "password": password},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["token_type"] == "bearer"
+    assert body["expires_in"] == 900
+    assert "password_hash" not in body
+    assert email_address not in response.text
+    assert password not in response.text
+    claims = jwt.decode(
+        body["access_token"],
+        "local-test-signing-secret-at-least-32-bytes",
+        algorithms=["HS256"],
+    )
+    assert claims["sub"] == str(user_id)
+    assert claims["exp"] - claims["iat"] == 900
+    assert body["expires_at"].endswith("+00:00")
+    assert int(datetime.fromisoformat(body["expires_at"]).timestamp()) == claims["exp"]
+
+
+def test_login_rejects_invalid_email_without_echoing_password(client):
+    password = "correct-horse-7"
+    response = client.post(
+        "/api/auth/login", json={"email": "invalid-email", "password": password}
+    )
+
+    assert response.status_code == 422
+    assert password not in response.text
+
+
+def test_login_uses_generic_error_for_unknown_email_and_wrong_password(
+    client, tracked_emails
+):
+    email_address = "wrong-password@example.com"
+    tracked_emails.add(email_address)
+    _create_login_user(email_address, "correct-horse-7")
+    unknown = client.post(
+        "/api/auth/login",
+        json={"email": "unknown@example.com", "password": "wrong-password"},
+    )
+    wrong_password = client.post(
+        "/api/auth/login",
+        json={"email": email_address, "password": "wrong-password"},
+    )
+
+    assert unknown.status_code == wrong_password.status_code == 401
+    assert unknown.json()["detail"] == wrong_password.json()["detail"]
+    assert "unknown@example.com" not in unknown.text
+    assert "wrong-password" not in wrong_password.text
+
+
+def test_login_requires_verified_email_after_validating_password(
+    client, tracked_emails
+):
+    email_address = "unverified-login@example.com"
+    tracked_emails.add(email_address)
+    _create_login_user(email_address, "correct-horse-7", is_verified=False)
+
+    incorrect = client.post(
+        "/api/auth/login",
+        json={"email": email_address, "password": "incorrect-password"},
+    )
+    valid = client.post(
+        "/api/auth/login",
+        json={"email": email_address, "password": "correct-horse-7"},
+    )
+
+    assert incorrect.status_code == 401
+    assert valid.status_code == 403
+    assert "verification" in valid.json()["detail"].lower()
+    assert "correct-horse-7" not in valid.text
+
+
+def test_login_fails_safely_when_jwt_secret_is_missing(
+    client, monkeypatch, tracked_emails
+):
+    email_address = "missing-secret@example.com"
+    tracked_emails.add(email_address)
+    _create_login_user(email_address, "correct-horse-7")
+    monkeypatch.setattr(auth_service, "load_dotenv", lambda: None)
+    monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
+
+    response = client.post(
+        "/api/auth/login",
+        json={"email": email_address, "password": "correct-horse-7"},
+    )
+
+    assert response.status_code == 503
+    assert "access_token" not in response.text
+    assert "JWT_SECRET_KEY" not in response.text
 
 
 def test_registration_normalizes_email_hashes_password_and_starts_unverified(

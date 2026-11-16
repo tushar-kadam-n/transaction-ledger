@@ -1,6 +1,6 @@
 
 import csv
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from io import StringIO
 from typing import Literal
 from uuid import UUID
@@ -18,6 +18,7 @@ from app.schemas.transaction import (
     TransactionResponse,
 )
 from app.services.ledger import add_transaction
+from app.time_utils import to_utc
 from fastapi.responses import JSONResponse, Response
 router = APIRouter(prefix="/api/accounts", tags=["Transactions"])
 global_router = APIRouter(prefix="/api", tags=["Transactions"])
@@ -108,14 +109,18 @@ def _query_transaction_history(
         count_statement = count_statement.where(search_filter)
 
     if start_date is not None:
-        start_boundary = datetime.combine(start_date, time.min)
+        start_boundary = datetime.combine(
+            start_date, time.min, tzinfo=timezone.utc
+        )
         statement = statement.where(Transaction.transaction_date >= start_boundary)
         count_statement = count_statement.where(
             Transaction.transaction_date >= start_boundary
         )
 
     if end_date is not None:
-        end_boundary = datetime.combine(end_date + timedelta(days=1), time.min)
+        end_boundary = datetime.combine(
+            end_date + timedelta(days=1), time.min, tzinfo=timezone.utc
+        )
         statement = statement.where(Transaction.transaction_date < end_boundary)
         count_statement = count_statement.where(
             Transaction.transaction_date < end_boundary
@@ -177,7 +182,7 @@ def export_transaction_history(
     )
 
     for row_number, (transaction, account_name) in enumerate(history["rows"], 1):
-        transaction_date = transaction.transaction_date
+        transaction_date = to_utc(transaction.transaction_date)
         writer.writerow(
             [
                 row_number,
