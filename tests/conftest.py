@@ -10,6 +10,8 @@ from app.database import Base, get_db
 from app.main import app
 from app.models.account import Account
 from app.models.transaction import Transaction
+from app.models.user import User
+from app.services.authentication import create_access_token, hash_password
 
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
@@ -54,7 +56,20 @@ def client():
 
     app.dependency_overrides[get_db] = override_get_db
 
+    # Ledger regression tests operate as one local, verified test user.
+    test_email = "ledger-regression@example.test"
+    with TestingSessionLocal() as db:
+        user = db.query(User).filter(User.email == test_email).one_or_none()
+        if user is None:
+            user = User(email=test_email, password_hash=hash_password("local-test-password"), is_verified=True)
+            db.add(user)
+            db.commit()
+        test_user_id = user.id
+    os.environ.setdefault("JWT_SECRET_KEY", "local-test-signing-secret-at-least-32-bytes")
+    token, _ = create_access_token(test_user_id, os.environ["JWT_SECRET_KEY"])
+
     with TestClient(app) as test_client:
+        test_client.headers["Authorization"] = f"Bearer {token}"
         yield test_client
 
     app.dependency_overrides.clear()

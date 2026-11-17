@@ -6,9 +6,16 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from dotenv import load_dotenv
+
+from app.database import get_db
+from app.models.user import User
 
 
 _password_hasher = PasswordHasher()
@@ -146,3 +153,34 @@ def create_csrf_token() -> str:
 
 def hash_verification_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> User:
+    unauthorized = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise unauthorized
+    try:
+        secret = get_jwt_signing_secret()
+        claims = jwt.decode(
+            credentials.credentials,
+            secret,
+            algorithms=["HS256"],
+            options={"require": ["sub", "exp"]},
+        )
+        user_id = UUID(claims["sub"])
+    except (JWTConfigurationError, jwt.PyJWTError, ValueError, TypeError, KeyError):
+        raise unauthorized from None
+    user = db.scalar(select(User).where(User.id == user_id))
+    if user is None or not user.is_verified:
+        raise unauthorized
+    return user

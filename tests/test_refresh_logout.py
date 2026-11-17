@@ -50,7 +50,8 @@ def test_login_sets_hashed_refresh_token_and_csrf_cookie(client, monkeypatch):
         assert "HttpOnly" in response.headers["set-cookie"]
 
         with TestingSessionLocal() as db:
-            session = db.scalar(select(RefreshSession))
+            user = db.scalar(select(User).where(User.email == email))
+            session = db.scalar(select(RefreshSession).where(RefreshSession.user_id == user.id))
             assert session is not None
             assert session.token_hash == hashlib.sha256(
                 refresh_token.encode()
@@ -86,7 +87,8 @@ def test_refresh_rotates_token_and_rejects_replay(client, monkeypatch):
         assert new_csrf and new_csrf != old_csrf
 
         with TestingSessionLocal() as db:
-            session = db.scalar(select(RefreshSession))
+            user = db.scalar(select(User).where(User.email == email))
+            session = db.scalar(select(RefreshSession).where(RefreshSession.user_id == user.id))
             assert session is not None
             assert session.token_hash == hashlib.sha256(
                 new_refresh.encode()
@@ -169,7 +171,8 @@ def test_logout_revokes_session_and_clears_cookies(client, monkeypatch):
         assert 'csrf_token="";' in logout.headers["set-cookie"]
 
         with TestingSessionLocal() as db:
-            session = db.scalar(select(RefreshSession))
+            user = db.scalar(select(User).where(User.email == email))
+            session = db.scalar(select(RefreshSession).where(RefreshSession.user_id == user.id))
             assert session is not None and session.revoked_at is not None
         assert client.post(
             "/api/auth/refresh", headers={"X-CSRF-Token": csrf_token}
@@ -189,7 +192,8 @@ def test_expired_refresh_session_is_rejected(client, monkeypatch):
         )
         csrf_token = login.cookies.get("csrf_token")
         with TestingSessionLocal() as db:
-            session = db.scalar(select(RefreshSession))
+            user = db.scalar(select(User).where(User.email == email))
+            session = db.scalar(select(RefreshSession).where(RefreshSession.user_id == user.id))
             session.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
             db.commit()
         response = client.post(

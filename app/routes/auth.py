@@ -1,4 +1,5 @@
 import html
+import hashlib
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -16,7 +17,8 @@ from app.database import get_db
 from app.models.auth_token import AuthToken
 from app.models.refresh_session import RefreshSession
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegistrationRequest, VerifyEmailRequest
+from app.schemas.auth import (ForgotPasswordRequest, LoginRequest, RegistrationRequest,
+                              ResetPasswordRequest, VerifyEmailRequest)
 from app.services.authentication import (
     ACCESS_TOKEN_LIFETIME,
     CookieConfigurationError,
@@ -30,6 +32,7 @@ from app.services.authentication import (
     hash_password,
     hash_refresh_token,
     hash_verification_token,
+    create_verification_token as create_reset_token,
     verify_password,
 )
 from app.services.email import EmailConfigurationError, EmailDeliveryError, send_email
@@ -253,6 +256,81 @@ def _verification_link(token: str) -> str:
         raise EmailConfigurationError("Email service is not configured.")
 
     return f"{frontend_url}/verify-email?{urlencode({'token': token})}"
+
+
+def _password_reset_link(token: str) -> str:
+    load_dotenv()
+    frontend_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+    try:
+        parsed = urlsplit(frontend_url)
+    except ValueError:
+        parsed = None
+    if (parsed is None or parsed.scheme not in {"http", "https"} or not parsed.netloc
+            or parsed.username or parsed.password or parsed.query or parsed.fragment):
+        raise EmailConfigurationError("Email service is not configured.")
+    return f"{frontend_url}/reset-password?{urlencode({'token': token})}"
+
+
+@router.post("/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    safe_response = {"message": "If an account exists for that email, password reset instructions will be sent."}
+    user = db.scalar(select(User).where(User.email == payload.email))
+    if user is None:
+        return safe_response
+    now = datetime.now(timezone.utc)
+    raw_token = create_reset_token()
+    try:
+        link = _password_reset_link(raw_token)
+        db.query(AuthToken).filter(
+            AuthToken.user_id == user.id,
+            AuthToken.purpose == "password_reset",
+            AuthToken.used_at.is_(None),
+        ).update({AuthToken.used_at: now}, synchronize_session=False)
+        db.add(AuthToken(
+            user_id=user.id,
+            token_hash=hashlib.sha256(raw_token.encode("utf-8")).hexdigest(),
+            purpose="password_reset",
+            expires_at=now + timedelta(minutes=30),
+        ))
+        db.flush()
+        await send_email(
+            user.email, "Reset your Transaction Ledger password",
+            "<p>A password reset was requested for your account.</p>"
+            f'<p><a href="{html.escape(link, quote=True)}">Reset password</a></p>',
+        )
+        db.commit()
+    except (EmailConfigurationError, EmailDeliveryError):
+        db.rollback()
+    except Exception:
+        db.rollback()
+    return safe_response
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    token_hash = hashlib.sha256(payload.token.get_secret_value().encode("utf-8")).hexdigest()
+    record = db.execute(select(AuthToken).where(
+        AuthToken.token_hash == token_hash,
+        AuthToken.purpose == "password_reset",
+    ).with_for_update()).scalar_one_or_none()
+    if record is None or record.used_at is not None or record.expires_at <= now:
+        raise HTTPException(status_code=400, detail="Invalid or expired password reset token.")
+    user = db.execute(select(User).where(User.id == record.user_id).with_for_update()).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired password reset token.")
+    try:
+        user.password_hash = hash_password(payload.password.get_secret_value())
+        record.used_at = now
+        db.query(RefreshSession).filter(
+            RefreshSession.user_id == user.id,
+            RefreshSession.revoked_at.is_(None),
+        ).update({RefreshSession.revoked_at: now}, synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Password reset is temporarily unavailable.") from None
+    return {"message": "Password has been reset successfully."}
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)

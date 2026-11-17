@@ -97,6 +97,36 @@ revoked and both the refresh and CSRF cookies are cleared. Logout is safe to
 repeat and returns success when the refresh cookie is missing or already
 invalid; CSRF failures still return `403`.
 
+## Authentication: Forgot password
+
+**Endpoint:** `POST /api/auth/forgot-password`
+
+Request body: `{"email":"person@example.com"}`. Email is trimmed and
+lowercased. For every valid address, the API returns the same generic
+response. For existing users it emails a single-use reset link; only the
+SHA-256 token hash is stored. The token expires after 30 minutes. Delivery
+errors do not expose provider details. Configure `FRONTEND_URL`,
+`RESEND_API_KEY`, and `EMAIL_FROM` as for verification mail.
+
+## Authentication: Reset password
+
+**Endpoint:** `POST /api/auth/reset-password`
+
+Send `token`, `password`, and `confirm_password`. Passwords must contain at
+least eight characters and match. Invalid, expired, or used tokens return a
+generic `400`. On success, Argon2 stores the new password, consumes the token,
+and revokes all existing refresh sessions transactionally.
+
+## Protected APIs and ownership
+
+Send `Authorization: Bearer <access_token>` on every account and transaction
+API request. Missing, invalid, expired, malformed, or unusable-user tokens
+return `401`. Account creation assigns ownership server-side. Account listing
+and balance access are limited to owned accounts. Transaction creation,
+history, search, filtering, pagination, and CSV export are restricted through
+account ownership. Another user's account ID returns `404`. Legacy accounts
+with null `user_id` remain unchanged and unavailable to authenticated users.
+
 ### Authentication environment variables
 
 | Variable | Default | Purpose |

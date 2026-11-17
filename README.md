@@ -121,12 +121,24 @@ The API should be available at:
 
 ## API Endpoints
 
+Registration, email verification, login, refresh, logout, forgot-password,
+and reset-password are public authentication routes. All account and
+transaction data routes require `Authorization: Bearer <access_token>` using
+the 15-minute HS256 access token returned by login or refresh. Accounts are
+owned by the authenticated user; account creation assigns ownership on the
+server. Transactions inherit ownership through their account. Existing
+accounts whose `user_id` is null remain unowned and are not exposed or
+automatically assigned to a registering user.
+
 | Method | Endpoint                                  | Description                          |
 | ------ | ----------------------------------------- | ------------------------------------ |
 | POST   | `/api/auth/login`                         | Authenticate and set auth cookies    |
+| POST   | `/api/auth/forgot-password`                | Request password reset instructions |
+| POST   | `/api/auth/reset-password`                 | Set a new password using a reset token |
 | POST   | `/api/auth/refresh`                       | Rotate refresh token and issue access token |
 | POST   | `/api/auth/logout`                        | Revoke session and clear auth cookies |
 | POST   | `/api/accounts`                           | Create an account                    |
+| GET    | `/api/accounts`                           | List the authenticated user's accounts |
 | GET    | `/api/accounts/{account_id}/balance`      | Retrieve an account balance          |
 | POST   | `/api/accounts/{account_id}/transactions` | Create a credit or debit transaction |
 | GET    | `/api/transactions`                       | Retrieve global or filtered history  |
