@@ -111,20 +111,21 @@ def _set_auth_cookies(
         "secure": settings.secure,
         "samesite": settings.same_site,
     }
+    csrf_common = {**common, "path": "/"}
     response.set_cookie(
         settings.refresh_cookie_name,
         refresh_token,
         httponly=True,
         **common,
     )
-    response.set_cookie(settings.csrf_cookie_name, csrf_token, **common)
+    response.set_cookie(settings.csrf_cookie_name, csrf_token, **csrf_common)
 
 
 def _clear_auth_cookies(response: Response, settings) -> None:
     for cookie_name in (settings.refresh_cookie_name, settings.csrf_cookie_name):
         response.delete_cookie(
             cookie_name,
-            path=settings.path,
+            path=settings.path if cookie_name == settings.refresh_cookie_name else "/",
             domain=settings.domain,
             samesite=settings.same_site,
         )

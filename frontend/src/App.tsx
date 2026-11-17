@@ -18,8 +18,11 @@ import { useTransactionCreation } from "./hooks/useTransactionCreation";
 import { useTransactionHistory } from "./hooks/useTransactionHistory";
 import type { Account } from "./types/account";
 import "./App.css";
+import { AuthProvider, useAuth } from "./auth";
+import { ForgotPasswordView, LoginView, RegisterView, ResetPasswordView, VerifyEmailView } from "./components/auth/AuthViews";
 
-function App() {
+function Dashboard() {
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<NavigationTab>(NAVIGATION_TABS[0]);
   const history = useTransactionHistory(activeTab === "History");
   const overview = useOverviewData(activeTab);
@@ -70,7 +73,7 @@ function App() {
       <Sidebar activeTab={activeTab} onNavigate={setActiveTab} />
 
       <main className="main">
-        <TopBar pageTitle={activeTab} />
+        <TopBar pageTitle={activeTab} userEmail={user?.email} onLogout={logout} />
 
         {activeTab === "Overview" && (
           <OverviewPage
@@ -169,6 +172,37 @@ function App() {
       </main>
     </div>
   );
+}
+
+function AuthenticatedApp() {
+  const auth = useAuth();
+  const [, setLocation] = useState(window.location.pathname + window.location.search);
+
+  function navigate(path: string) {
+    window.history.pushState({}, "", path);
+    setLocation(path);
+  }
+
+  useEffect(() => {
+    const handlePopState = () => setLocation(window.location.pathname + window.location.search);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  if (auth.isRestoring) return <main className="auth-page"><p className="auth-loading">Restoring your session…</p></main>;
+  if (auth.isAuthenticated) return <Dashboard />;
+
+  switch (window.location.pathname) {
+    case "/register": return <RegisterView navigate={navigate} />;
+    case "/forgot-password": return <ForgotPasswordView navigate={navigate} />;
+    case "/verify-email": return <VerifyEmailView navigate={navigate} />;
+    case "/reset-password": return <ResetPasswordView navigate={navigate} />;
+    default: return <LoginView navigate={navigate} />;
+  }
+}
+
+function App() {
+  return <AuthProvider><AuthenticatedApp /></AuthProvider>;
 }
 
 export default App;
