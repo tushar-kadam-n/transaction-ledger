@@ -1318,3 +1318,283 @@ h2 {
     gap: 0;
   }
 }
+
+/* Themeable semantic surfaces. Component layout rules above remain shared by every theme. */
+.app,
+.main,
+.auth-page {
+  background: var(--page-background);
+}
+
+.sidebar {
+  color: var(--sidebar-text);
+  background: var(--sidebar-background);
+}
+
+.brand-icon {
+  color: var(--accent);
+  background: var(--green-soft);
+}
+
+.nav-label,
+.eyebrow,
+.version {
+  color: var(--text-secondary);
+}
+
+.nav-item {
+  color: var(--sidebar-text);
+}
+
+.nav-item:hover,
+.nav-item.active {
+  color: var(--text-primary);
+  background: var(--sidebar-active);
+}
+
+.nav-item.active {
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+.sidebar-footer {
+  border-color: var(--border);
+  color: var(--sidebar-text);
+}
+
+.status-dot {
+  background: var(--accent);
+}
+
+.auth-page {
+  background: var(--page-background);
+}
+
+.auth-card,
+.stat-card,
+.content-card,
+.main > form {
+  background: var(--elevated-surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.auth-field > span,
+.account-form-field label,
+.account-initial-balance span,
+.transaction-form label,
+.history-filters label,
+.main > form p:first-of-type {
+  color: var(--text-primary);
+}
+
+.auth-field input,
+.main > form input,
+.main > form select,
+.main > form textarea,
+.account-form-field input,
+.account-form-field select,
+.account-form-field textarea,
+.transaction-form input,
+.transaction-form select,
+.history-filters select,
+.history-search-field input,
+.history-filters input[type="date"] {
+  color: var(--text-primary);
+  background: var(--input-background);
+  border-color: var(--input-border);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.auth-field input:focus,
+.main > form input:focus,
+.main > form select:focus,
+.main > form textarea:focus,
+.account-form-field input:focus,
+.account-form-field select:focus,
+.account-form-field textarea:focus,
+.transaction-form input:focus,
+.transaction-form select:focus,
+.history-filters select:focus,
+.history-search-field input:focus,
+.history-filters input[type="date"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  outline: none;
+}
+
+.primary-button,
+.main > form button {
+  color: #fff;
+  background: var(--accent);
+}
+
+.primary-button:hover,
+.main > form button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.secondary-button {
+  color: var(--text-primary);
+  background: var(--input-background);
+  border-color: var(--border);
+}
+
+.secondary-button:hover:not(:disabled) {
+  color: var(--accent-hover);
+  background: var(--green-soft);
+  border-color: var(--accent);
+}
+
+.logout-button,
+.muted,
+.stat-card p,
+.overview-bottom .overview-account-card p,
+.transaction-info p,
+.transaction-info span,
+.balance-panel span,
+.history-pagination span,
+.history-content > .muted {
+  color: var(--text-secondary);
+}
+
+.welcome {
+  border-color: var(--border);
+  background: var(--green-soft);
+}
+
+.welcome h2,
+.welcome p:last-child,
+.overview-bottom .eyebrow {
+  color: var(--text-primary);
+}
+
+.welcome-mark,
+.avatar {
+  color: var(--accent);
+  background: var(--elevated-surface);
+}
+
+.empty-state,
+.account-initial-balance,
+.balance-panel {
+  color: var(--text-secondary);
+  background: var(--input-background);
+  border-color: var(--border);
+}
+
+.overview-bottom .overview-account-card {
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+.overview-bottom .overview-account-card span,
+.accounts-grid .stat-card span,
+.transaction-amount strong,
+.account-initial-balance strong,
+.projected-balance-panel.credit strong {
+  color: var(--success);
+}
+
+.recent-transaction-item,
+.history-table th,
+.history-table td {
+  border-color: var(--border);
+}
+
+.transaction-badge.credit {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 18%, var(--surface-background));
+}
+
+.transaction-badge.debit {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface-background));
+}
+
+.projected-balance-panel.credit {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--success) 9%, var(--surface-background));
+}
+
+.projected-balance-panel.debit {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface-background));
+}
+
+.projected-balance-panel.debit strong,
+.transaction-badge.debit + strong,
+.history-table tbody tr:has(.transaction-badge.debit) td:nth-child(4) {
+  color: var(--danger);
+}
+
+.success-message {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, var(--surface-background));
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border));
+}
+
+.error-message,
+.field-error,
+.form-error,
+.transaction-form .amount-validation-message {
+  color: var(--danger);
+}
+
+.error-message {
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-background));
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+
+.history-table-wrapper {
+  background: var(--surface-background);
+}
+
+.history-table th {
+  color: var(--text-secondary);
+  background: var(--table-header-background);
+}
+
+.history-table tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-background));
+}
+
+.theme-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.theme-selector select {
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 8px;
+  color: var(--text-primary);
+  background: var(--input-background);
+  font-size: 11px;
+}
+
+.theme-selector select:focus,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .theme-selector span {
+    display: none;
+  }
+
+  .theme-selector select {
+    max-width: 90px;
+  }
+}
