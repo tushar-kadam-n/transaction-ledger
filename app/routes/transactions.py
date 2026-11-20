@@ -1,6 +1,6 @@
 
 import csv
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from io import StringIO
 from typing import Literal
 from uuid import UUID
@@ -18,6 +18,9 @@ from app.schemas.transaction import (
     TransactionResponse,
 )
 from app.services.ledger import add_transaction
+from app.time_utils import to_utc
+from app.models.user import User
+from app.services.authentication import get_current_user
 from fastapi.responses import JSONResponse, Response
 router = APIRouter(prefix="/api/accounts", tags=["Transactions"])
 global_router = APIRouter(prefix="/api", tags=["Transactions"])
@@ -30,8 +33,14 @@ global_router = APIRouter(prefix="/api", tags=["Transactions"])
 def create_transaction(
     account_id: UUID,
     payload: TransactionCreate,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    owned_account = db.scalar(select(Account.id).where(
+        Account.id == account_id, Account.user_id == user.id
+    ))
+    if owned_account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
     transaction, balance, duplicate = add_transaction(
         db,
         account_id,
@@ -66,6 +75,7 @@ def create_transaction(
 def _query_transaction_history(
     db: Session,
     account_id: UUID | None,
+    user_id: UUID,
     type: Literal["credit", "debit"] | None,
     page: int = 1,
     limit: int = 10,
@@ -74,7 +84,9 @@ def _query_transaction_history(
     end_date: date | None = None,
     paginate: bool = True,
 ):
-    if account_id is not None and db.get(Account, account_id) is None:
+    if account_id is not None and db.scalar(select(Account.id).where(
+        Account.id == account_id, Account.user_id == user_id
+    )) is None:
         raise HTTPException(
             status_code=404,
             detail="Account not found",
@@ -86,6 +98,8 @@ def _query_transaction_history(
     count_statement = select(func.count()).select_from(Transaction).join(
         Account, Transaction.account_id == Account.id
     )
+    statement = statement.where(Account.user_id == user_id)
+    count_statement = count_statement.where(Account.user_id == user_id)
 
     if account_id is not None:
         statement = statement.where(Transaction.account_id == account_id)
@@ -108,14 +122,18 @@ def _query_transaction_history(
         count_statement = count_statement.where(search_filter)
 
     if start_date is not None:
-        start_boundary = datetime.combine(start_date, time.min)
+        start_boundary = datetime.combine(
+            start_date, time.min, tzinfo=timezone.utc
+        )
         statement = statement.where(Transaction.transaction_date >= start_boundary)
         count_statement = count_statement.where(
             Transaction.transaction_date >= start_boundary
         )
 
     if end_date is not None:
-        end_boundary = datetime.combine(end_date + timedelta(days=1), time.min)
+        end_boundary = datetime.combine(
+            end_date + timedelta(days=1), time.min, tzinfo=timezone.utc
+        )
         statement = statement.where(Transaction.transaction_date < end_boundary)
         count_statement = count_statement.where(
             Transaction.transaction_date < end_boundary
@@ -151,11 +169,13 @@ def export_transaction_history(
     search: str | None = Query(default=None),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     history = _query_transaction_history(
         db,
         account_id,
+        user.id,
         type,
         search=search,
         start_date=start_date,
@@ -177,7 +197,7 @@ def export_transaction_history(
     )
 
     for row_number, (transaction, account_name) in enumerate(history["rows"], 1):
-        transaction_date = transaction.transaction_date
+        transaction_date = to_utc(transaction.transaction_date)
         writer.writerow(
             [
                 row_number,
@@ -207,10 +227,11 @@ def get_all_transaction_history(
     end_date: date | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     history = _query_transaction_history(
-        db, account_id, type, page, limit, search, start_date, end_date
+        db, account_id, user.id, type, page, limit, search, start_date, end_date
     )
 
     return {
@@ -238,9 +259,10 @@ def get_transaction_history(
     type: Literal["credit", "debit"] | None = Query(default=None),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    history = _query_transaction_history(db, account_id, type, page, limit)
+    history = _query_transaction_history(db, account_id, user.id, type, page, limit)
 
     return {
         "account_id": account_id,

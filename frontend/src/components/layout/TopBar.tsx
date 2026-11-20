@@ -1,8 +1,10 @@
 interface TopBarProps {
   pageTitle: string;
+  userEmail?: string;
+  onLogout: () => Promise<void>;
 }
 
-export function TopBar({ pageTitle }: TopBarProps) {
+export function TopBar({ pageTitle, userEmail, onLogout }: TopBarProps) {
   return (
     <header className="topbar">
       <div>
@@ -11,7 +13,8 @@ export function TopBar({ pageTitle }: TopBarProps) {
       </div>
       <div className="profile">
         <div className="avatar">TL</div>
-        <span>Ledger Workspace</span>
+        <span>{userEmail ?? "Ledger Workspace"}</span>
+        <button className="logout-button" onClick={() => void onLogout()}>Sign out</button>
       </div>
     </header>
   );
