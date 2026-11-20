@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://transaction-ledger-api-pnjv.onrender.com/api/:path*"
+    }
+  ]
+}
