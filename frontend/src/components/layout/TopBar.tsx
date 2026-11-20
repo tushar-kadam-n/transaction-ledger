@@ -1,3 +1,5 @@
+import { ThemeSelector } from "./ThemeSelector";
+
 interface TopBarProps {
   pageTitle: string;
   userEmail?: string;
@@ -12,6 +14,7 @@ export function TopBar({ pageTitle, userEmail, onLogout }: TopBarProps) {
         <h1>{pageTitle}</h1>
       </div>
       <div className="profile">
+        <ThemeSelector />
         <div className="avatar">TL</div>
         <span>{userEmail ?? "Ledger Workspace"}</span>
         <button className="logout-button" onClick={() => void onLogout()}>Sign out</button>

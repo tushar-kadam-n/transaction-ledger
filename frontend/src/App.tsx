@@ -19,6 +19,7 @@ import { useTransactionHistory } from "./hooks/useTransactionHistory";
 import type { Account } from "./types/account";
 import "./App.css";
 import { AuthProvider, useAuth } from "./auth";
+import { ThemeProvider } from "./theme";
 import { ForgotPasswordView, LoginView, RegisterView, ResetPasswordView, VerifyEmailView } from "./components/auth/AuthViews";
 
 function Dashboard() {
@@ -202,7 +203,7 @@ function AuthenticatedApp() {
 }
 
 function App() {
-  return <AuthProvider><AuthenticatedApp /></AuthProvider>;
+  return <ThemeProvider><AuthProvider><AuthenticatedApp /></AuthProvider></ThemeProvider>;
 }
 
 export default App;
