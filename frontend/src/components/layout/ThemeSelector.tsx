@@ -1,4 +1,4 @@
-import { THEMES, useTheme, type Theme } from "../../theme";
+import { THEMES, useTheme, type Theme } from "../../theme-context";
 
 const THEME_LABELS: Record<Theme, string> = {
   light: "Light",

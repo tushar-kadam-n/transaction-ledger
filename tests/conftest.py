@@ -46,7 +46,7 @@ def setup_test_database():
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     def override_get_db():
         db = TestingSessionLocal()
         try:
@@ -65,8 +65,9 @@ def client():
             db.add(user)
             db.commit()
         test_user_id = user.id
-    os.environ.setdefault("JWT_SECRET_KEY", "local-test-signing-secret-at-least-32-bytes")
-    token, _ = create_access_token(test_user_id, os.environ["JWT_SECRET_KEY"])
+    test_secret = "local-test-signing-secret-at-least-32-bytes"
+    monkeypatch.setenv("JWT_SECRET_KEY", test_secret)
+    token, _ = create_access_token(test_user_id, test_secret)
 
     with TestClient(app) as test_client:
         test_client.headers["Authorization"] = f"Bearer {token}"

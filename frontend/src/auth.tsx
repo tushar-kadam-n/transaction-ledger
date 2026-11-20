@@ -1,18 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getAccessToken, login as loginRequest, logout as logoutRequest, refreshAccessToken, setAccessToken, setAuthenticationFailureHandler } from "./api";
 import type { AuthTokenResponse } from "./api";
-
-type AuthContextValue = {
-  isAuthenticated: boolean;
-  isRestoring: boolean;
-  user: { email: string } | null;
-  accessToken: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshSession: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext } from "./auth-context";
 
 function userFromEmail(email: string) { return { email }; }
 
@@ -66,8 +55,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const value = useContext(AuthContext);
-  if (!value) throw new Error("useAuth must be used inside AuthProvider");
-  return value;
-}
