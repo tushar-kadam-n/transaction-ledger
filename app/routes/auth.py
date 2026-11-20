@@ -1,5 +1,6 @@
 import html
 import hashlib
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -39,6 +40,7 @@ from app.services.email import EmailConfigurationError, EmailDeliveryError, send
 
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/login")
@@ -74,13 +76,30 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             )
         )
         db.commit()
-    except (JWTConfigurationError, CookieConfigurationError):
+    except (JWTConfigurationError, CookieConfigurationError) as exc:
+        logger.error(
+            "Login authentication configuration failure: exception_class=%s",
+            type(exc).__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication is temporarily unavailable.",
         ) from None
-    except IntegrityError:
+    except IntegrityError as exc:
         db.rollback()
+        original = exc.orig
+        sqlstate = getattr(original, "sqlstate", None) or getattr(
+            original, "pgcode", None
+        )
+        diagnostic = getattr(original, "diag", None)
+        constraint_name = getattr(diagnostic, "constraint_name", None)
+        logger.error(
+            "Login refresh-session integrity failure: exception_class=%s "
+            "sqlstate=%s constraint_name=%s",
+            type(exc).__name__,
+            sqlstate,
+            constraint_name,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication is temporarily unavailable.",

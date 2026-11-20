@@ -2,6 +2,7 @@ import hashlib
 import html
 import re
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 from unittest.mock import AsyncMock
 
@@ -9,6 +10,8 @@ import pytest
 import jwt
 from argon2 import PasswordHasher
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.models.auth_token import AuthToken
 from app.models.user import User
@@ -148,7 +151,7 @@ def test_login_requires_verified_email_after_validating_password(
 
 
 def test_login_fails_safely_when_jwt_secret_is_missing(
-    client, monkeypatch, tracked_emails
+    client, monkeypatch, tracked_emails, caplog
 ):
     email_address = "missing-secret@example.com"
     tracked_emails.add(email_address)
@@ -162,8 +165,83 @@ def test_login_fails_safely_when_jwt_secret_is_missing(
     )
 
     assert response.status_code == 503
+    assert "JWTConfigurationError" in caplog.text
     assert "access_token" not in response.text
     assert "JWT_SECRET_KEY" not in response.text
+    assert password not in caplog.text
+    assert email_address not in caplog.text
+
+
+def test_login_logs_cookie_configuration_failure_without_sensitive_values(
+    client, monkeypatch, tracked_emails, caplog
+):
+    email_address = "cookie-config-login@example.com"
+    password = "sensitive-login-password"
+    tracked_emails.add(email_address)
+    _create_login_user(email_address, password)
+    monkeypatch.setenv("JWT_SECRET_KEY", "local-test-signing-secret-at-least-32-bytes")
+    monkeypatch.setattr(
+        auth_routes,
+        "get_cookie_settings",
+        lambda: (_ for _ in ()).throw(
+            auth_service.CookieConfigurationError("sensitive-cookie-setting")
+        ),
+    )
+
+    response = client.post(
+        "/api/auth/login", json={"email": email_address, "password": password}
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Authentication is temporarily unavailable."
+    assert "CookieConfigurationError" in caplog.text
+    assert "sensitive-cookie-setting" not in caplog.text
+    assert password not in caplog.text
+    assert email_address not in caplog.text
+
+
+def test_login_logs_safe_integrity_diagnostics_without_sensitive_values(
+    client, monkeypatch, tracked_emails, caplog
+):
+    email_address = "integrity-login@example.com"
+    password = "sensitive-login-password"
+    tracked_emails.add(email_address)
+    _create_login_user(email_address, password)
+    monkeypatch.setenv("JWT_SECRET_KEY", "local-test-signing-secret-at-least-32-bytes")
+    constraint_name = "fk_refresh_sessions_user_id_users"
+
+    class FakeDriverError(Exception):
+        sqlstate = "23503"
+        diag = SimpleNamespace(constraint_name=constraint_name)
+
+    original = FakeDriverError("sensitive-driver-message")
+
+    def fail_commit(_session):
+        raise IntegrityError(
+            "sensitive-sql-with-password",
+            {"password": password, "token": "sensitive-refresh-token"},
+            original,
+        )
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+
+    response = client.post(
+        "/api/auth/login", json={"email": email_address, "password": password}
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Authentication is temporarily unavailable."
+    assert "IntegrityError" in caplog.text
+    assert "23503" in caplog.text
+    assert constraint_name in caplog.text
+    for sensitive_value in (
+        email_address,
+        password,
+        "sensitive-sql-with-password",
+        "sensitive-refresh-token",
+        "sensitive-driver-message",
+    ):
+        assert sensitive_value not in caplog.text
 
 
 def test_registration_normalizes_email_hashes_password_and_starts_unverified(
