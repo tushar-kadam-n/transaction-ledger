@@ -1,0 +1,141 @@
+name: Production Smoke Tests
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  smoke-test:
+    if: >
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+      RENDER_SERVICE_ID: srv-dbrl4loae00c73ftmd8g
+      VERCEL_PROJECT_ID: prj_jCMEaW0Eq7TlG4J8FGbpVCkapC2s
+
+    steps:
+      - name: Trigger Render deployment
+        id: render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          response=$(curl --fail-with-body --silent --show-error \
+            --request POST \
+            "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
+            --header "Authorization: Bearer ${RENDER_API_KEY}" \
+            --header "Content-Type: application/json" \
+            --data "{\"commitId\":\"${COMMIT_SHA}\"}")
+
+          deploy_id=$(echo "$response" | jq -r '.id // empty')
+          deploy_sha=$(echo "$response" | jq -r '.commit.id // empty')
+
+          if [ -z "$deploy_id" ] || [ "$deploy_sha" != "$COMMIT_SHA" ]; then
+            echo "Render deployment was not created for the expected commit."
+            exit 1
+          fi
+
+          echo "deploy_id=$deploy_id" >> "$GITHUB_OUTPUT"
+          echo "Render deployment triggered for $COMMIT_SHA."
+
+      - name: Wait for Render deployment
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_DEPLOY_ID: ${{ steps.render.outputs.deploy_id }}
+        run: |
+          for i in {1..40}; do
+            response=$(curl --fail-with-body --silent --show-error \
+              "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys/${RENDER_DEPLOY_ID}" \
+              --header "Authorization: Bearer ${RENDER_API_KEY}")
+
+            status=$(echo "$response" | jq -r '.status // empty')
+            deploy_sha=$(echo "$response" | jq -r '.commit.id // empty')
+
+            if [ "$deploy_sha" != "$COMMIT_SHA" ]; then
+              echo "Render deployment commit SHA mismatch."
+              exit 1
+            fi
+
+            if [ "$status" = "live" ]; then
+              echo "Render deployment is live."
+              exit 0
+            fi
+
+            case "$status" in
+              build_failed|update_failed|canceled|pre_deploy_failed)
+                echo "Render deployment failed: $status"
+                exit 1
+                ;;
+            esac
+
+            echo "Render status: $status. Waiting..."
+            sleep 15
+          done
+
+          echo "Render deployment timed out."
+          exit 1
+
+      - name: Wait for Vercel production deployment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          for i in {1..40}; do
+            response=$(curl --fail-with-body --silent --show-error --get \
+              "https://api.vercel.com/v7/deployments" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+              --data-urlencode "projectId=${VERCEL_PROJECT_ID}" \
+              --data-urlencode "target=production" \
+              --data-urlencode "sha=${COMMIT_SHA}" \
+              --data-urlencode "limit=10")
+
+            state=$(echo "$response" | jq -r '.deployments[0].state // empty')
+
+            if [ "$state" = "READY" ]; then
+              echo "Vercel production deployment is ready."
+              exit 0
+            fi
+
+            case "$state" in
+              ERROR|CANCELED|BLOCKED)
+                echo "Vercel deployment failed: $state"
+                exit 1
+                ;;
+            esac
+
+            echo "Vercel status: ${state:-not found}. Waiting..."
+            sleep 15
+          done
+
+          echo "Vercel deployment timed out."
+          exit 1
+
+      - name: Check frontend production
+        run: |
+          curl --fail --silent --show-error --location \
+            -o /dev/null \
+            https://transaction-ledger-dun.vercel.app
+
+          echo "Frontend production check passed."
+
+      - name: Check backend health
+        run: |
+          response=$(curl --fail --silent --show-error \
+            https://transaction-ledger-api-pnjv.onrender.com/health)
+
+          echo "$response" | python3 -c \
+            "import json,sys; sys.exit(0 if json.load(sys.stdin).get('status') == 'ok' else 1)"
+
+          echo "Backend health check passed."
