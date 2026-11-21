@@ -36,6 +36,11 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/transaction_ledger_test
+        run: alembic upgrade head
+
       - name: Run backend tests
         env:
           DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/transaction_ledger_test
