@@ -1,116 +1,291 @@
-# Deployment and DevOps Documentation
+# Transaction Ledger – Deployment & DevOps Documentation
 
-**Project:** Transaction Ledger  
 **Version:** 1.0  
-**Status:** Current CI/CD baseline
+**Project:** Transaction Ledger
 
-## 1. Hosting and production services
+## 1. Overview
 
-| Component | Platform | Production branch |
-|---|---|---|
-| Source repository | GitHub | `main` |
-| Frontend | Vercel | `main` |
-| Backend | Render | `main` |
+The Transaction Ledger application uses a separate frontend and backend deployment architecture.
 
-Production URLs:
-- Frontend: https://transaction-ledger-dun.vercel.app
-- Backend: https://transaction-ledger-api-pnjv.onrender.com
-- Backend health: https://transaction-ledger-api-pnjv.onrender.com/health
+| Component      | Platform       | Technology                          |
+| -------------- | -------------- | ----------------------------------- |
+| Frontend       | Vercel         | React, TypeScript, Vite             |
+| Backend        | Render         | FastAPI, Python                     |
+| Database       | PostgreSQL     | PostgreSQL                          |
+| Source Control | GitHub         | Git                                 |
+| CI/CD          | GitHub Actions | Automated validation and deployment |
 
-## 2. Branch and pull request workflow
+### Production URLs
 
-- `main` is the production branch.
-- Work is developed on feature/working branches.
-- Pull requests target `main`.
-- GitHub ruleset protects `main`.
-- Required checks are `backend` and `frontend`.
-- Force pushes and branch deletion are restricted.
-- Required approval count is zero for the current solo-maintained workflow.
+- **Frontend:** https://transaction-ledger-dun.vercel.app
+- **Backend:** https://transaction-ledger-api-pnjv.onrender.com
 
-Review the active GitHub ruleset if these settings change.
+## 2. Deployment Architecture
 
-## 3. Continuous Integration
+The frontend and backend are deployed independently.
 
-The GitHub Actions workflow named `CI` runs for configured branch pushes and pull requests targeting `main`.
+- The React frontend is hosted on Vercel.
+- The FastAPI backend is hosted on Render.
+- PostgreSQL provides persistent application data storage.
+- GitHub Actions validates code changes and coordinates production deployment.
 
-### Backend job
-- Python 3.10
-- PostgreSQL 16 service
-- Install `requirements.txt`
-- Run `alembic upgrade head`
-- Run `pytest`
+### API Request Routing
 
-### Frontend job
-- Node.js 22
-- `npm ci`
-- `npm run lint`
-- `npm run build`
+The frontend uses `/api` as its default API base URL.
 
-Both `backend` and `frontend` checks are required for merging into `main`.
+The Vercel configuration in `frontend/vercel.json` contains two rewrite rules:
 
-## 4. Continuous deployment
+1. Requests matching `/api/:path*` are forwarded to the Render backend.
+2. Other application paths are rewritten to `/index.html` to support frontend-side routing.
 
-### Frontend — Vercel
+This allows the frontend to communicate with the backend through relative API paths without requiring the Render URL in individual frontend requests.
 
-Vercel's native Git integration deploys production when changes reach `main`. Feature branches and pull requests can receive preview deployments. The frontend uses `/api` and Vercel proxy/rewrite configuration to reach the backend.
+## 3. Source Control and Branching
 
-### Backend — Render
+GitHub is used for source control and collaboration.
 
-Render Auto-Deploy is disabled. GitHub Actions initiates the backend deployment after CI succeeds on a push to `main`. The workflow requests deployment for the exact commit SHA from the completed CI run.
+The CI workflow runs on:
 
-## 5. Production Smoke Tests workflow
+- Pushes to `main`.
+- Pushes to `CI/CD_Implementation`.
+- Pull requests targeting `main`.
 
-The workflow file is `.github/workflows/smoke-test.yml`.
+The `main` branch is protected through a GitHub ruleset.
 
-Trigger:
-- `workflow_run` after the workflow named `CI` completes on `main`.
-- It proceeds only for a successful CI run caused by a push.
+### Main Branch Protection
 
-Sequence:
-1. Trigger Render deployment for the upstream commit SHA.
-2. Verify the deployment ID and commit SHA.
-3. Poll Render until the deployment is live, or fail on terminal error/timeout.
-4. Poll Vercel production deployments for the matching project and commit SHA until ready, or fail on error/timeout.
-5. Request the production frontend.
-6. Request backend `/health` and validate the JSON status is `ok`.
+The `main-protection` ruleset enforces:
 
-Concurrency:
-- Group: `production-deployment`
-- `cancel-in-progress: false`
-- This avoids cancelling an active deployment run. GitHub concurrency allows one pending run per group, so a newer pending run may replace an older pending run.
+- Pull requests before merging.
+- Required backend CI checks.
+- Required frontend CI checks.
+- Restrictions on branch deletion.
+- Restrictions on force pushes.
 
-## 6. GitHub secrets and credentials
+The project currently requires zero approving reviews, allowing the solo developer to merge after the required checks pass.
 
-The workflow uses repository secrets:
-- `RENDER_API_KEY`
-- `VERCEL_TOKEN`
+## 4. Continuous Integration
 
-The Render API key was configured with read access to services and permission to run deployments. The Vercel token is used to query deployment status.
+The CI workflow is defined in:
 
-Never store secret values in this document, workflow logs, commits or screenshots. Rotate credentials if exposure is suspected.
+`.github/workflows/ci.yml`
 
-## 7. Environment separation and safety
+It contains two independent jobs.
 
-- Local development uses local PostgreSQL database `transaction_ledger` through the verified local `.env`.
-- CI uses a disposable PostgreSQL service.
-- Production uses hosted configuration.
-- Do not point local development or destructive test commands at production.
-- Keep environment files and secrets out of Git.
+### 4.1 Backend CI
 
-Exact environment variable names (other than the GitHub secret names listed above), Vercel rewrite configuration and Render build/start commands should be verified from current deployment settings and repository files before being added.
+Environment:
 
-## 8. Operational checks and recovery
+- Ubuntu latest runner.
+- Python 3.10.
+- PostgreSQL 16 service.
 
-Current automated checks confirm deployment state and basic HTTP health. A documented rollback procedure, staging environment, backup schedule, restore drill, monitoring and alerting are **not yet established in this baseline**.
+Execution steps:
 
-Before production incidents, inspect provider deployment history and logs. Do not perform a rollback or database restore without assessing schema compatibility and data-loss implications.
+1. Check out the repository.
+2. Set up Python.
+3. Install dependencies from `requirements.txt`.
+4. Run Alembic database migrations.
+5. Execute backend tests using Pytest.
 
-## 9. Future DevOps improvements
+The CI pipeline uses a separate PostgreSQL database:
 
-- Staging environment and promotion workflow
-- Automated rollback/recovery process
-- End-to-end tests
-- Dependency/security scanning
-- Monitoring and alerting
-- Database backup and restore drills
-- Deployment notifications and release summaries
+`transaction_ledger_test`
+
+This database is disposable and isolated from local development and production databases.
+
+### 4.2 Frontend CI
+
+Environment:
+
+- Ubuntu latest runner.
+- Node.js 22.
+
+Execution steps:
+
+1. Check out the repository.
+2. Set up Node.js.
+3. Install dependencies using `npm ci`.
+4. Run frontend lint checks using `npm run lint`.
+5. Generate the production build using `npm run build`.
+
+### 4.3 CI Success Criteria
+
+Both backend and frontend jobs must complete successfully.
+
+The required CI checks are enforced by the `main` branch protection ruleset before merging.
+
+## 5. Continuous Deployment
+
+Production deployment is coordinated through GitHub Actions.
+
+The deployment workflow is defined in:
+
+`.github/workflows/smoke-test.yml`
+
+It listens for completion of the `CI` workflow on `main`.
+
+Deployment proceeds only when:
+
+- The upstream workflow was triggered by a push.
+- The upstream CI workflow completed successfully.
+
+### 5.1 Backend Deployment – Render
+
+Render automatic deployment is disabled.
+
+After successful CI:
+
+1. GitHub Actions retrieves the exact commit SHA from the completed CI workflow.
+2. The Render deployment API is called using that commit SHA.
+3. The deployment response is checked to confirm the expected commit.
+4. GitHub Actions polls the deployment status.
+5. Deployment succeeds only when Render reports the status as `live`.
+
+Failed deployment states and deployment timeouts cause the workflow to fail.
+
+### 5.2 Frontend Deployment – Vercel
+
+Vercel uses its native Git integration.
+
+- Production deployments are created from `main`.
+- Preview deployments are generated for feature branches and pull requests.
+
+After the backend deployment is live, GitHub Actions checks for the Vercel production deployment associated with the same commit SHA.
+
+The workflow waits until that deployment reaches the `READY` state.
+
+Failed or blocked deployments and timeouts cause the workflow to fail.
+
+### 5.3 Deployment Serialization
+
+The production deployment workflow uses the concurrency group:
+
+`production-deployment`
+
+Concurrent production deployments are not allowed to cancel an already-running deployment.
+
+This prevents overlapping production deployment workflows.
+
+## 6. Production Smoke Tests
+
+After deployment, the workflow performs basic production availability checks.
+
+### Frontend Check
+
+The workflow sends an HTTP request to:
+
+`https://transaction-ledger-dun.vercel.app`
+
+The request follows redirects and fails if the response is unsuccessful.
+
+### Backend Health Check
+
+The workflow requests:
+
+`https://transaction-ledger-api-pnjv.onrender.com/health`
+
+The expected response is:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+The workflow validates the returned JSON status.
+
+The deployment workflow succeeds only after the required deployment and smoke-test steps complete successfully.
+
+## 7. Environment Configuration
+
+Configuration values are supplied through environment variables rather than hardcoded application settings.
+
+### 7.1 Backend Environment Variables
+
+| Variable           | Purpose                                                 |
+| ------------------ | ------------------------------------------------------- |
+| `DATABASE_URL`     | PostgreSQL database connection string                   |
+| `JWT_SECRET_KEY`   | JWT signing secret                                      |
+| `RESEND_API_KEY`   | Email delivery service API key                          |
+| `EMAIL_FROM`       | Sender email address                                    |
+| `FRONTEND_URL`     | Frontend URL used for application links                 |
+| `FRONTEND_ORIGINS` | Allowed frontend origins for CORS                       |
+| `COOKIE_SECURE`    | Controls the Secure attribute of authentication cookies |
+| `CSRF_HEADER_NAME` | Configures the CSRF request header                      |
+
+Additional authentication cookie and refresh-token settings are configurable:
+
+| Variable                         | Default / Purpose                                |
+| -------------------------------- | ------------------------------------------------ |
+| `REFRESH_COOKIE_NAME`            | Refresh cookie name; defaults to `refresh_token` |
+| `REFRESH_TOKEN_COOKIE_NAME`      | Fallback refresh cookie name                     |
+| `CSRF_COOKIE_NAME`               | CSRF cookie name; defaults to `csrf_token`       |
+| `COOKIE_PATH`                    | Cookie path; defaults to `/api/auth`             |
+| `COOKIE_SAMESITE`                | SameSite policy; defaults to `lax`               |
+| `COOKIE_DOMAIN`                  | Optional cookie domain                           |
+| `APP_ENV`                        | Environment identifier; defaults to `local`      |
+| `REFRESH_TOKEN_LIFETIME_SECONDS` | Refresh-token lifetime in seconds                |
+| `REFRESH_TOKEN_LIFETIME`         | Fallback refresh-token lifetime in seconds       |
+
+The refresh-token lifetime defaults to seven days.
+
+### 7.2 Frontend Environment Variables
+
+| Variable            | Purpose               | Default |
+| ------------------- | --------------------- | ------- |
+| `VITE_API_BASE_URL` | Frontend API base URL | `/api`  |
+
+### 7.3 Configuration Management
+
+Environment variables must be configured in the relevant deployment platform or local environment.
+
+- Local development uses the local `.env` configuration.
+- Production backend settings are managed through Render.
+- Frontend deployment settings are managed through Vercel.
+- CI/CD credentials are stored as GitHub Actions secrets.
+
+Actual secret values must never be committed to the repository.
+
+## 8. GitHub Actions Secrets
+
+The production deployment workflow requires the following GitHub repository secrets:
+
+| Secret           | Purpose                                             |
+| ---------------- | --------------------------------------------------- |
+| `RENDER_API_KEY` | Authenticates requests to the Render deployment API |
+| `VERCEL_TOKEN`   | Authenticates requests to the Vercel deployment API |
+
+Secrets must be configured through GitHub repository settings.
+
+They must not be printed in workflow logs, committed to source control, or included in documentation.
+
+## 9. Deployment Workflow Summary
+
+The production deployment process follows this sequence:
+
+1. Developer pushes changes to a branch or opens a pull request.
+2. GitHub Actions executes backend and frontend CI checks.
+3. Required checks must pass before changes can be merged into `main`.
+4. Changes are merged into `main`.
+5. The CI workflow validates the main-branch push.
+6. After successful CI, the production deployment workflow starts.
+7. Render deploys the exact commit SHA.
+8. GitHub Actions verifies that Render is live.
+9. GitHub Actions verifies that the matching Vercel production deployment is ready.
+10. Frontend and backend health checks are executed.
+
+## 10. Operational Guidelines
+
+- Do not use production databases for local development or routine automated testing.
+- Keep local, CI and production database configurations separate.
+- Validate database migrations through CI before production deployment.
+- Keep API keys, JWT secrets and database credentials outside source control.
+- Review CI failures before merging changes.
+- Verify production smoke-test results after deployment.
+- Avoid manual production deployments that bypass the established CI/CD process.
+- Keep deployment configuration synchronized with the actual application architecture.
+
+## 11. Document Maintenance
+
+This document should be updated when deployment platforms, environment variables, GitHub Actions workflows, branch protection rules, infrastructure or deployment procedures change.
