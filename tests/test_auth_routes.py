@@ -1,6 +1,7 @@
 import hashlib
 import html
 import re
+import uuid
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
@@ -154,14 +155,15 @@ def test_login_fails_safely_when_jwt_secret_is_missing(
     client, monkeypatch, tracked_emails, caplog
 ):
     email_address = "missing-secret@example.com"
+    password = "correct-horse-7"
     tracked_emails.add(email_address)
-    _create_login_user(email_address, "correct-horse-7")
+    _create_login_user(email_address, password)
     monkeypatch.setattr(auth_service, "load_dotenv", lambda: None)
     monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
 
     response = client.post(
         "/api/auth/login",
-        json={"email": email_address, "password": "correct-horse-7"},
+        json={"email": email_address, "password": password},
     )
 
     assert response.status_code == 503
@@ -203,7 +205,7 @@ def test_login_logs_cookie_configuration_failure_without_sensitive_values(
 def test_login_logs_safe_integrity_diagnostics_without_sensitive_values(
     client, monkeypatch, tracked_emails, caplog
 ):
-    email_address = "integrity-login@example.com"
+    email_address = f"integrity-login-{uuid.uuid4()}@example.com"
     password = "sensitive-login-password"
     tracked_emails.add(email_address)
     _create_login_user(email_address, password)
@@ -223,11 +225,11 @@ def test_login_logs_safe_integrity_diagnostics_without_sensitive_values(
             original,
         )
 
-    monkeypatch.setattr(Session, "commit", fail_commit)
-
-    response = client.post(
-        "/api/auth/login", json={"email": email_address, "password": password}
-    )
+    with monkeypatch.context() as request_patch:
+        request_patch.setattr(Session, "commit", fail_commit)
+        response = client.post(
+            "/api/auth/login", json={"email": email_address, "password": password}
+        )
 
     assert response.status_code == 503
     assert response.json()["detail"] == "Authentication is temporarily unavailable."

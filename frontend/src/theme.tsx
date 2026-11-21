@@ -1,16 +1,7 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-
-export const THEMES = ["light", "dark", "midnight", "forest"] as const;
-export type Theme = (typeof THEMES)[number];
+import { useEffect, useState, type ReactNode } from "react";
+import { THEMES, ThemeContext, type Theme } from "./theme-context";
 
 const THEME_STORAGE_KEY = "transaction-ledger-theme";
-
-interface ThemeContextValue {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-}
-
-const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 function getStoredTheme(): Theme {
   try {
@@ -36,8 +27,3 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }
 
-export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (!context) throw new Error("useTheme must be used within ThemeProvider");
-  return context;
-}

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { forgotPassword, register, resetPassword, verifyEmail } from "../../api";
-import { useAuth } from "../../auth";
+import { useAuth } from "../../auth-context";
 
 type Props = { navigate: (path: string) => void };
 
@@ -37,8 +37,8 @@ export function ForgotPasswordView({ navigate }: Props) {
 }
 
 export function VerifyEmailView({ navigate }: Props) {
-  const token = new URLSearchParams(window.location.search).get("token"); const [status, setStatus] = useState<"loading" | "success" | "error">("loading"); const [error, setError] = useState("");
-  useEffect(() => { if (!token) { setError("This verification link is missing its token."); setStatus("error"); return; } verifyEmail(token).then(() => setStatus("success")).catch((caught) => { setError(caught instanceof Error ? caught.message : "This verification link is invalid or expired."); setStatus("error"); }); }, [token]);
+  const token = new URLSearchParams(window.location.search).get("token"); const [status, setStatus] = useState<"loading" | "success" | "error">(token ? "loading" : "error"); const [error, setError] = useState(token ? "" : "This verification link is missing its token.");
+  useEffect(() => { if (!token) return; verifyEmail(token).then(() => setStatus("success")).catch((caught) => { setError(caught instanceof Error ? caught.message : "This verification link is invalid or expired."); setStatus("error"); }); }, [token]);
   return <AuthShell title="Verify your email" subtitle="Confirm your email address to activate your account."><div className="auth-result">{status === "loading" && <p>Verifying your email…</p>}{status === "success" && <><p className="success-text">Your email has been verified.</p><button className="primary-button" onClick={() => navigate("/login")}>Continue to sign in</button></>}{status === "error" && <><p className="form-error">{error}</p><button className="secondary-button" onClick={() => navigate("/login")}>Back to sign in</button></>}</div></AuthShell>;
 }
 

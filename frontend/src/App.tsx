@@ -18,7 +18,8 @@ import { useTransactionCreation } from "./hooks/useTransactionCreation";
 import { useTransactionHistory } from "./hooks/useTransactionHistory";
 import type { Account } from "./types/account";
 import "./App.css";
-import { AuthProvider, useAuth } from "./auth";
+import { AuthProvider } from "./auth";
+import { useAuth } from "./auth-context";
 import { ThemeProvider } from "./theme";
 import { ForgotPasswordView, LoginView, RegisterView, ResetPasswordView, VerifyEmailView } from "./components/auth/AuthViews";
 
