@@ -1,19 +1,19 @@
-# Transaction Ledger — Documentation
+# Project Documentation
 
 This directory is the single source of truth for project documentation.
 
 ## Documents
 
-| Document | Purpose |
-|---|---|
-| [Project technical documentation](project-technical-documentation.md) | Overview, architecture, technology stack and project status |
+| Document                                                                      | Purpose                                                       |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [Project technical documentation](project-technical-documentation.md)         | Overview, architecture, technology stack and project status   |
 | [Software requirements specification](software-requirements-specification.md) | Functional and non-functional requirements and business rules |
-| [API documentation](api-documentation.md) | Backend API reference |
-| [Database documentation](database-documentation.md) | Schema, relationships, constraints and migrations |
-| [Testing documentation](testing-documentation.md) | Test strategy, test coverage and CI validation |
-| [Deployment and DevOps documentation](deployment-devops-documentation.md) | Branching, CI/CD, deployments and production verification |
+| [API documentation](api-documentation.md)                                     | Backend API reference                                         |
+| [Database documentation](database-documentation.md)                           | Schema, relationships, constraints and migrations             |
+| [Testing documentation](testing-documentation.md)                             | Testing strategy, tools, environments and CI validation       |
+| [Deployment and DevOps documentation](deployment-devops-documentation.md)     | Branching, CI/CD, deployments and production verification     |
 
-## Maintenance rules
+## Maintenance Rules
 
 1. Update documentation alongside implementation changes whenever practical.
 2. Verify details against source code, tests, configuration or deployment before documenting them.
@@ -23,9 +23,10 @@ This directory is the single source of truth for project documentation.
 6. Prefer relative links between documents.
 7. Record significant changes in the changelog section of the project technical document.
 
-## Baseline
+## Documentation Baseline
 
 - Baseline date: 21 November 2026
+- Documentation version: 1.0
 - Repository: `tushar-kadam-n/transaction-ledger`
 - Primary branch: `main`
 
